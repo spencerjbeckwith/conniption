@@ -4,7 +4,7 @@
   "description": "A WebSocket-based framework for creating fast and fun browser games",
   "main": "conniption.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node conniption.js"
   },
   "repository": {
     "type": "git",
@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/spencerjbeckwith/conniption/issues"
   },
-  "homepage": "https://github.com/spencerjbeckwith/conniption#readme"
+  "homepage": "https://github.com/spencerjbeckwith/conniption#readme",
+  "dependencies": {
+    "ws": "^7.2.1"
+  }
 }

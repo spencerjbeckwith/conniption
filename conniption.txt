@@ -1,0 +1,9 @@
+conniption
+A WebSocket-based framework for creating fast and fun browser games
+Designed to be as fast, stable, secure, and extensible as possible.
+
+Features:
+	-Packet structures
+	-Game Room management
+	-Server configuration/logging
+
