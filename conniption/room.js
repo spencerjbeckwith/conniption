@@ -1,8 +1,10 @@
 module.exports = class Room {
-    constructor(name) {
+    constructor(name,maxPlayers,passcode = "") {
         this.id = Math.floor(Math.random()*1000000000);
-
         this.name = name;
+        this.passcode = passcode;
+        this.maxPlayers = maxPlayers;
+
         this.players = [];
         this.inProgress = false;
         this.manager = undefined;
@@ -32,7 +34,7 @@ module.exports = class Room {
     }
 
     pingAll() {
-        
+
     }
 
     broadcast() {

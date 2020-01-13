@@ -1,3 +1,7 @@
 {
-    "Port": 44956
+    "Port": 44956,
+    "RoomRequestTimeout": 3000,
+    "AllowSameIP": false,
+    "DefaultPlayersPerRoom": 4,
+    "MaxPlayersPerRoom": 10
 }

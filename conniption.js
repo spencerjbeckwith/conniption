@@ -12,12 +12,13 @@ const Player = require("./conniption/player.js");
 const RoomManager = {
     list: [],
 
-    addRoom(name) {
-        let room = new Room(name);
+    addRoom(name,maxPlayers = getConfig("DefaultPlayersPerRoom"),passcode = "") {
+        let room = new Room(name,Math.min(maxPlayers,getConfig("MaxPlayersPerRoom")),passcode);
         this.list.push(room);
         room.manager = this;
         return room.id;
     },
+
     getRoom(arg) {
         for (let i = 0; i < this.list.length; i++) {
             if (this.list[i].id === arg || this.list[i].name === arg) {
@@ -26,6 +27,7 @@ const RoomManager = {
         }
         return undefined;
     },
+
     removeRoom(arg) {
         let room = this.getRoom(arg);
         if (room !== undefined) {
@@ -34,6 +36,21 @@ const RoomManager = {
             return true;
         }
         return false;
+    },
+
+    getSendable() {
+        let returnObject = [];
+        for (let i = 0; i < this.list.length; i++) {
+            returnObject[i] = {
+                id: this.list[i].id,
+                name: this.list[i].name,
+                passcode: (this.list[i].passcode !== ""),
+                maxPlayers: this.list[i].maxPlayers,
+                players: this.list[i].players.length,
+                inProgress: this.list[i].inProgress
+            }
+        }
+        return JSON.stringify(returnObject);
     }
 }
 
@@ -89,11 +106,10 @@ function launchServer() {
     console.log(`Opening server on port ${Config.Port}...`);
 
     const wss = new WebSocket.Server({
-        port: Config.Port
+        port: getConfig("Port")
     });
 
     wss.on("listening",() => {
-        RoomManager.addRoom("Lobby");
         console.log("Server opened successfully.");
     });
 
@@ -102,10 +118,16 @@ function launchServer() {
     });
 
     wss.on("connection",(ws) => {
+        if (ws.roomRequestTimeout === undefined) {
+            ws.roomRequestTimeout = setTimeout((ws) => {
+                ws.close();
+            },getConfig("RoomRequestTimeout"),ws);
+        }
+
         ws.on("message",(data) => {
             let receivedPacket = {};
             try {
-                receivedPAcket = JSON.parse(data);
+                receivedPacket = JSON.parse(data);
             }
             catch (error) {
                 receivedPacket.type = "__INVALID__";
@@ -114,11 +136,13 @@ function launchServer() {
                 if (receivedPacket.type === "__INVALID__") {
                     throw `Packet could not be parsed`;
                 }
-                //Do other checks on the packet data here. Like: sender, passcode, etc.
+
+                //Do other checks on the packet data here. Like: sender etc.
+
                 //Call correct packet function(s) for the type
                 if (PacketCallbacks[receivedPacket.type]) {
                     PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
-                        packetFunction(ws,receivedPacket) //change args for packet functions here, if you want.
+                        packetFunction(ws,receivedPacket);
                     });
                 } else {
                     throw `Received unidentifiable packet type: ${receivedPacket.type}`
@@ -130,7 +154,7 @@ function launchServer() {
                     console.log(`Error occured at: ${error.fileName} >> ${error.lineNumber}`);
                 }
 
-                //Send error the client?
+                //Send error to the client?
             }
         });
 
@@ -139,6 +163,31 @@ function launchServer() {
         });
     });
 }
+
+addPacketType("fetch",(ws) => {
+    clearTimeout(ws.roomRequestTimeout);
+    new Packet("fetch",RoomManager.getSendable()).send(ws);
+    ws.close();
+});
+
+addPacketType("make",(ws,receivedPacket) => {
+    clearTimeout(ws.roomRequestTimeout);
+    let obj;
+    try {
+        obj = JSON.parse(receivedPacket.message)
+    }
+    catch {
+        throw `Could not parse make request.`;
+    }
+    let newID = RoomManager.addRoom(obj.name,obj.maxPlayers,obj.passcode);
+    new Packet("make",newID).send(ws);
+    ws.close();
+});
+
+addPacketType("join",(ws,receivedPacket) => {
+    clearTimeout(ws.roomRequestTimeout);
+
+});
 
 //Put default packet types here.
 
