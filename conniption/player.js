@@ -1,12 +1,11 @@
 const PlayerCommon = require("./playercommon.js");
-
 module.exports = class Player {
     /**
-     * 
+     * Creates a new instance of a Player.
      * @param {String} name The username of the Player.
-     * @param {*} ws The WebSocket used to receive this player's messages.
-     * @param {*} ip The IP from which this player connected.
-     * @param {*} room The room this player has joined.
+     * @param {WebSocket} ws The WebSocket used to receive this player's messages.
+     * @param {String} ip The IP from which this player connected.
+     * @param {Number} room The room ID this player has joined.
      */
     constructor(name,ws,ip,room) {
         this.connected = true;

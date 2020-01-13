@@ -7,7 +7,39 @@ Features:
 	-Game Room management
 	-Server configuration/logging
 
-Config. A JSON file that gets parsed.
-
 Use prototypes to add new functions or properties to PlayerCommon, Packet, Room, etc.
 OR you can even extend them, yeah?
+
+So how does this all actually work?
+When a player connects, they are held in the home Playerarray
+When they join a Room, they get moved in there.
+
+-When a client first joins, it will fetch a list of games from the server.
+	sends packet: fetch. expects a fetch back.
+-When a client decides to make their own game, it will send a list of parameters to the server who will then make that room
+	Sends packet: makeroom. excepts a makeroom back.
+-When a client decides to join a room, they send a join packet. If they are allowed to join the room with the ID they specified, they get a join packet back.
+
+Make Rooms and Players emit EVENTS! That then can be modified by a user of Conniption...
+
+Using a client:
+connect("fetch") will request a packet, that contains a list of all game rooms.
+connect("make") will make a new game and join it.
+connect("join") will join the room with the same ID as our roomID variable.
+
+
+To do:
+-Player disconnection
+-Sending other players to other clients. A client-side PlayerCommon class, maybe?
+-Player session saving
+-Blacklist and whitelist stuff
+-DOCUMENT EVERYTHING!!
+
+-fill in all them empty functions...
+-assess what functionality is missing in this, from the earlier project.
+	-look at the old config file
+-commands n shit
+-new kind of Packet: a JSONPacket that holds a JSON object by default, instead of just a message.
+-how to make a player? and how to make the player easily extensible? ooh.
+	-how to extend it at all? It has something to do with modifying prototypes, yes?
+-how to make an easy client-side framework that can be used in pure JS?

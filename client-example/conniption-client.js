@@ -3,6 +3,7 @@ class Packet {
         this.sender = name;
         this.type = type;
         this.message = message;
+        this.room = roomID;
     }
 
     send(ws) {
@@ -27,6 +28,7 @@ let name = "Example";
 let roomRequestName = "Example Room";
 let roomRequestMaxPlayers = 4;
 let roomRequestPasscode = "";
+let roomID = 0;
 
 const p = document.querySelector("p");
 
@@ -50,7 +52,7 @@ function connect(roomRequest) {
             }
             case ("join"): {
                 console.log("Requesting to join a room...");
-                new Packet("join").send(ws);
+                new Packet("join",roomID).send(ws);
                 break;
             }
             default: {
@@ -110,6 +112,18 @@ addPacketType("fetch",(ws,receivedPacket) => {
 });
 
 addPacketType("make",(ws,receivedPacket) => {
-    console.log("Our room is room ID "+receivedPacket.message+"!");
-    //Attempt to connect to it here...
+    console.log("Our room is room ID "+receivedPacket.message+"! Connecting...");
+    roomID = receivedPacket.message;
+    new Packet("join",roomID).send(ws);
+});
+
+addPacketType("join",(ws,receivedPacket) => {
+    console.log("We joined the game!");
+    p.textContent = "We joined the game!";
+});
+
+addPacketType("refusal",(ws,receivedPacket) => {
+    console.error(`Connection refused: ${receivedPacket.message}`);
+    p.textContent = receivedPacket.message;
+    ws.close();
 });

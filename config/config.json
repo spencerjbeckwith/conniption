@@ -1,7 +1,19 @@
 {
     "Port": 44956,
     "RoomRequestTimeout": 3000,
-    "AllowSameIP": false,
+    "RoomEmptyTimeout": 10000,
     "DefaultPlayersPerRoom": 4,
-    "MaxPlayersPerRoom": 10
+    "MaxPlayersPerRoom": 10,
+    "AllowJoinInProgress": false,
+    "UseWhitelist": false,
+    "UseBlacklist": false,
+    "Users": {
+        "Name": {
+            "MinLength": 3,
+            "MaxLength": 15,
+            "DisallowedCharacters": " `!@#$%^&*()_+-=[]{}\\|\";:'./<>?"
+        },
+        "MustHaveUniqueName": false,
+        "MustHaveUniqueIP": false
+    }
 }

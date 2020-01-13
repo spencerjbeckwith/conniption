@@ -1,9 +1,9 @@
-const fs = require("fs");
 const WebSocket = require("ws");
 
-let Config = {};
 let PacketCallbacks = {};
 
+const Config = require("./conniption/config.js");
+const Utility = require("./conniption/utility.js");
 const Packet = require("./conniption/packet.js");
 const Room = require("./conniption/room.js");
 const PlayerCommon = require("./conniption/playercommon.js");
@@ -12,22 +12,43 @@ const Player = require("./conniption/player.js");
 const RoomManager = {
     list: [],
 
-    addRoom(name,maxPlayers = getConfig("DefaultPlayersPerRoom"),passcode = "") {
-        let room = new Room(name,Math.min(maxPlayers,getConfig("MaxPlayersPerRoom")),passcode);
+    /**
+     * Creates a new Room.
+     * @param {String} name The name used to identify the Room by.
+     * @param {String} creatorName The name used by the Player who requested the room. Will be the first host when they connect.
+     * @param {[Number]} maxPlayers Maximum number of players who can connect to the room.
+     * @param {[String]} passcode An optional passcode needed to connect to the room.
+     * @returns {Number} The ID of the new room.
+     */
+    addRoom(name,creatorName,maxPlayers = Config.get().DefaultPlayersPerRoom,passcode = "") {
+        if (name === "") {
+            throw `Room name must not be empty!`;
+        }
+        let room = new Room(name,creatorName,maxPlayers,passcode);
         this.list.push(room);
         room.manager = this;
         return room.id;
     },
 
+    /**
+     * Returns a specific Room instance.
+     * @param {Number|String} arg Either the name or the ID of the Room you want to find.
+     * @returns {Room} The Room instance associated with the name and ID.
+     */
     getRoom(arg) {
         for (let i = 0; i < this.list.length; i++) {
             if (this.list[i].id === arg || this.list[i].name === arg) {
                 return this.list[i];
             }
         }
-        return undefined;
+        throw `No Room exists with name or ID "${arg}"!`;
     },
 
+    /**
+     * Removes a specific Room instance from the server.
+     * @param {Number|String} arg Either the name or the ID of the Room you want to find.
+     * @returns {Boolean} If the room was removed successfully or not.
+     */
     removeRoom(arg) {
         let room = this.getRoom(arg);
         if (room !== undefined) {
@@ -38,6 +59,19 @@ const RoomManager = {
         return false;
     },
 
+    /**
+     * Removes all Room instances from the server.
+     */
+    removeAll() {
+        for (let i = 0; i < this.list.length; i++) {
+            this.removeRoom(this.list[i].id);
+        }
+    },
+
+    /**
+     * Returns an array of all Rooms currently present on the server, to be sent on a fetch packet.
+     * @returns {String} A stringified JSON array holding objects of each current Room.
+     */
     getSendable() {
         let returnObject = [];
         for (let i = 0; i < this.list.length; i++) {
@@ -54,40 +88,6 @@ const RoomManager = {
     }
 }
 
-/**
- * Loads configuration from a file.
- * @param {[String]} file The path to the file to load. Must be in JSON format.
- * @param {[Function]} callbackFn A callback function to invoke after the config has been loaded.
- */
-function loadConfig(file = "config/config.json",callbackFn = function(){}) {
-    console.log(`Loading configuration from ${file}...`);
-    fs.readFile(file,"utf8",(error,data) => {
-        try {
-            if (error) {
-                throw error;
-            }
-            try {
-                Config = JSON.parse(data);
-                console.log("Config loaded successfully.");
-                callbackFn();
-            }
-            catch (jsonError) {
-                throw `Error reading JSON from ${file}: ${jsonError}`;
-            }
-        }
-        catch (error) {
-            console.error(`Could not load configuration: ${error}`);
-        }
-    });
-}
-
-/**
- * Returns a value from the configuration file.
- * @param {String} name The name of the value to read from the loaded configuration.
- */
-function getConfig(name) {
-    return Config[name];
-}
 
 /**
  * Adds a new handling function when the server receives a packet of a certain type.
@@ -103,10 +103,10 @@ function addPacketType(name,callbackFn) {
  * Internal function that opens the server.
  */
 function launchServer() {
-    console.log(`Opening server on port ${Config.Port}...`);
+    console.log(`Opening server on port ${Config.get().Port}...`);
 
     const wss = new WebSocket.Server({
-        port: getConfig("Port")
+        port: Config.get().Port
     });
 
     wss.on("listening",() => {
@@ -121,7 +121,7 @@ function launchServer() {
         if (ws.roomRequestTimeout === undefined) {
             ws.roomRequestTimeout = setTimeout((ws) => {
                 ws.close();
-            },getConfig("RoomRequestTimeout"),ws);
+            },Config.get().RoomRequestTimeout,ws);
         }
 
         ws.on("message",(data) => {
@@ -137,8 +137,6 @@ function launchServer() {
                     throw `Packet could not be parsed`;
                 }
 
-                //Do other checks on the packet data here. Like: sender etc.
-
                 //Call correct packet function(s) for the type
                 if (PacketCallbacks[receivedPacket.type]) {
                     PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
@@ -153,8 +151,8 @@ function launchServer() {
                 if (error.fileName !== undefined && error.lineNumber !== undefined) { //Does this check actually do anything?
                     console.log(`Error occured at: ${error.fileName} >> ${error.lineNumber}`);
                 }
-
-                //Send error to the client?
+                new Packet("refusal",error).send(ws);
+                ws.close();
             }
         });
 
@@ -164,12 +162,14 @@ function launchServer() {
     });
 }
 
+//Fetch packet: return our list of Rooms.
 addPacketType("fetch",(ws) => {
     clearTimeout(ws.roomRequestTimeout);
     new Packet("fetch",RoomManager.getSendable()).send(ws);
     ws.close();
 });
 
+//Make packet: Make a new room, send it back to the requester to connect.
 addPacketType("make",(ws,receivedPacket) => {
     clearTimeout(ws.roomRequestTimeout);
     let obj;
@@ -177,16 +177,25 @@ addPacketType("make",(ws,receivedPacket) => {
         obj = JSON.parse(receivedPacket.message)
     }
     catch {
-        throw `Could not parse make request.`;
+        throw `Could not parse the make request.`;
     }
-    let newID = RoomManager.addRoom(obj.name,obj.maxPlayers,obj.passcode);
+    let newID = RoomManager.addRoom(obj.name,receivedPacket.sender,obj.maxPlayers,obj.passcode);
     new Packet("make",newID).send(ws);
-    ws.close();
 });
 
+//Join packet: Try to add the requester to their specified Room.
 addPacketType("join",(ws,receivedPacket) => {
     clearTimeout(ws.roomRequestTimeout);
-
+    let id = receivedPacket.room;
+    try {
+        let room = RoomManager.getRoom(id);
+        room.addPlayer(receivedPacket.sender,ws,ws._socket.remoteAddress);
+        new Packet("join").send(ws);
+        //Let other clients know about each other, HERE
+    }
+    catch (error) {
+        throw `Player could not join Room with ID "${id}": ${error}`;
+    }
 });
 
 //Put default packet types here.
@@ -196,17 +205,17 @@ addPacketType("join",(ws,receivedPacket) => {
  * @param {[String]} file The optional configuration file to use.
  */
 function launch(file = "config/config.json") {
-    loadConfig(file,launchServer);
+    Config.load(file,launchServer);
 }
 
 module.exports = {
+    Config: Config,
+    Utility: Utility,
     Packet: Packet,
     Room: Room,
     PlayerCommon: PlayerCommon,
     Player: Player,
     RoomManager: RoomManager,
-    loadConfig: loadConfig,
-    getConfig: getConfig,
     addPacketType: addPacketType,
     launch: launch
 }
