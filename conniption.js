@@ -4,6 +4,39 @@ const WebSocket = require("ws");
 let Config = {};
 let PacketCallbacks = {};
 
+const Packet = require("./conniption/packet.js");
+const Room = require("./conniption/room.js");
+const PlayerCommon = require("./conniption/playercommon.js");
+const Player = require("./conniption/player.js");
+
+const RoomManager = {
+    list: [],
+
+    addRoom(name) {
+        let room = new Room(name);
+        this.list.push(room);
+        room.manager = this;
+        return room.id;
+    },
+    getRoom(arg) {
+        for (let i = 0; i < this.list.length; i++) {
+            if (this.list[i].id === arg || this.list[i].name === arg) {
+                return this.list[i];
+            }
+        }
+        return undefined;
+    },
+    removeRoom(arg) {
+        let room = this.getRoom(arg);
+        if (room !== undefined) {
+            room.remove();
+            this.list.splice(this.list.indexOf(room),1);
+            return true;
+        }
+        return false;
+    }
+}
+
 /**
  * Loads configuration from a file.
  * @param {[String]} file The path to the file to load. Must be in JSON format.
@@ -60,7 +93,8 @@ function launchServer() {
     });
 
     wss.on("listening",() => {
-        console.log("Server listening successfully.");
+        RoomManager.addRoom("Lobby");
+        console.log("Server opened successfully.");
     });
 
     wss.on("error",(error) => {
@@ -68,12 +102,48 @@ function launchServer() {
     });
 
     wss.on("connection",(ws) => {
-        //Handle stuff here.
+        ws.on("message",(data) => {
+            let receivedPacket = {};
+            try {
+                receivedPAcket = JSON.parse(data);
+            }
+            catch (error) {
+                receivedPacket.type = "__INVALID__";
+            }
+            try {
+                if (receivedPacket.type === "__INVALID__") {
+                    throw `Packet could not be parsed`;
+                }
+                //Do other checks on the packet data here. Like: sender, passcode, etc.
+                //Call correct packet function(s) for the type
+                if (PacketCallbacks[receivedPacket.type]) {
+                    PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
+                        packetFunction(ws,receivedPacket) //change args for packet functions here, if you want.
+                    });
+                } else {
+                    throw `Received unidentifiable packet type: ${receivedPacket.type}`
+                }
+            }
+            catch (error) {
+                console.error(`Error receiving data: ${error}`);
+                if (error.fileName !== undefined && error.lineNumber !== undefined) { //Does this check actually do anything?
+                    console.log(`Error occured at: ${error.fileName} >> ${error.lineNumber}`);
+                }
+
+                //Send error the client?
+            }
+        });
+
+        ws.on("close",() => {
+            //Disconnect/remove client
+        });
     });
 }
 
+//Put default packet types here.
+
 /**
- * Invoke to launch a Conniption server.
+ * Invoke to launch the Conniption server.
  * @param {[String]} file The optional configuration file to use.
  */
 function launch(file = "config/config.json") {
@@ -81,6 +151,11 @@ function launch(file = "config/config.json") {
 }
 
 module.exports = {
+    Packet: Packet,
+    Room: Room,
+    PlayerCommon: PlayerCommon,
+    Player: Player,
+    RoomManager: RoomManager,
     loadConfig: loadConfig,
     getConfig: getConfig,
     addPacketType: addPacketType,

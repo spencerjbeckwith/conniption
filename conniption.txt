@@ -7,3 +7,7 @@ Features:
 	-Game Room management
 	-Server configuration/logging
 
+Config. A JSON file that gets parsed.
+
+Use prototypes to add new functions or properties to PlayerCommon, Packet, Room, etc.
+OR you can even extend them, yeah?
