@@ -1,3 +1,4 @@
+const Config = require("./config.js");
 const PlayerCommon = require("./playercommon.js");
 module.exports = class Player {
     /**
@@ -12,11 +13,23 @@ module.exports = class Player {
         this.ws = ws;
         this.ip = ip;
         this.room = room;
+        this.reconnectionTimeout = undefined;
 
         this.common = new PlayerCommon(name);
 
         //more stuff here
         //HOW can I make it so you can add more properties to a player?
+    }
+
+    /**
+     * Invoked to remove this player from memory safely upon a permanent disconnection.
+     */
+    remove() {
+        if (this.reconnectionTimeout !== undefined) {
+            clearTimeout(this.reconnectionTimeout);
+            this.reconnectionTimeout = undefined;
+        }
+        this.ws.close();
     }
 
     send(packet) {
@@ -31,5 +44,24 @@ module.exports = class Player {
 
     ban() {
 
+    }
+
+    /**
+     * Invoked on a player when their connection is lost, and you want them to have the chance to reconnect.
+     */
+    lost() {
+        this.connected = false;
+        this.reconnectionTimeout = setTimeout((obj) => {
+            obj.room.removePlayer(obj);
+        },Config.get().Users.ReconnectionTimeout*1000,this);
+    }
+
+    /**
+     * Invoked on a player who lost their connection, when they reconnect.
+     */
+    found() {
+        this.connected = true;
+        clearTimeout(this.reconnectionTimeout);
+        this.reconnectionTimeout = undefined;
     }
 }

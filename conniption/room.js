@@ -13,12 +13,19 @@ module.exports = class Room {
         this.manager = undefined;
         this.host = creatorName;
 
-        console.log(`New room "${this.name}" created with ID ${this.id}. Waiting for players...`)
+        console.log(`New room "${this.name}" created with ID ${this.id}. Waiting for players...`);
+        this.myTimeout = undefined;
         this.setEmptyTimeout();
     }
 
+    /**
+     * Invoke to remove this room from memory safely.
+     */
     remove() {
         //Handle the room removal stuff here
+        if (this.myTimeout !== undefined) {
+            clearTimeout(this.myTimeout);
+        }
         console.log(`Removed room "${this.name}" with ID ${this.id}.`);
     }
 
@@ -33,7 +40,14 @@ module.exports = class Room {
             throw `Name invalid! Must be ${Config.get().Users.Name.MinLength} to ${Config.get().Users.Name.MaxLength} characters long and must not contain any special characters.`;
         }
 
-        //See if we're a lost player, HERE
+        if (this.getPlayer(name) !== undefined) {
+            let obj = this.getPlayer(name);
+            if (!obj.connected && obj.common.name === name && obj.ip === ip && obj.room === this) {
+                //Found a lost player
+                this.foundPlayer(obj);
+                return;
+            }
+        }
 
         if (!Config.get().AllowJoinInProgress && this.inProgress) {
             throw `Cannot join a Room in progress!`;
@@ -64,6 +78,8 @@ module.exports = class Room {
 
         let player = new Player(name,ws,ip,this);
         this.players.push(player);
+        ws.myRoom = this;
+        ws.myPlayer = player;
         console.log(`Player "${name}" with IP ${ip} has joined Room "${this.name}" with ID ${this.id}.`);
         if (this.host === name) { //Our host connected!
             this.setHost(player);
@@ -77,12 +93,13 @@ module.exports = class Room {
      */
     getPlayer(arg) {
         let check;
-        for (let p = 0; p < this.players[p]; p++) {
+        for (let p = 0; p < this.players.length; p++) {
             if (typeof arg === "string") {
                 check = this.players[p].common.name;
             } else {
                 check = this.players[p].ws;
             }
+
             if (check === arg) {
                 return this.players[p];
             }
@@ -90,12 +107,55 @@ module.exports = class Room {
         return undefined;
     }
 
-    removePlayer() {
+    /**
+     * Removes a player from a room's list and disconnects them.
+     * @param {Player} player The player to remove.
+     */
+    removePlayer(player) {
+        if (player !== undefined) {
+            console.log(`${player.common.name} has disconnected.`);
+            player.remove();
+            this.players.splice(this.players.indexOf(player),1);
 
-        //Remove player here
+            //Are we empty? Set our timeout?
+            if (this.players.length === 0) {
+                this.setEmptyTimeout();
+            }
+        } else {
+            console.warn(`Tried to remove a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.name}" with ID ${this.id}.`);
+        }
+    }
 
-        if (this.players.length === 0) {
-            this.setEmptyTimeout();
+    /**
+     * Invoked to marks a player as "lost", holding them in memory until they reconnect or their timer runs out.
+     * @param {Player} player The player who lost their connection.
+     */
+    lostPlayer(player) {
+        if (player !== undefined) {
+            if (this.inProgress && Config.get().Users.AllowReconnection) {
+                let timeoutSeconds = Config.get().Users.ReconnectionTimeout;
+                console.log(`${player.common.name} has lost connection. They have ${timeoutSeconds} seconds to reconnect.`);
+                player.lost();
+            } else {
+                this.removePlayer(player);
+            }
+        } else {
+            console.warn(`Tried to lose a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.name}" with ID ${this.id}.`);
+        }
+    }
+
+    /**
+     * Invoked when a player who lost their connection reconnects to the room.
+     * @param {Player} player The player who has reconnected.
+     */
+    foundPlayer(player) {
+        if (player !== undefined) {
+            if (this.inProgress && !player.connected) {
+                console.log(`Player ${player.common.name} has reconnected!`);
+                player.found();
+            }
+        } else {
+            console.warn(`Tried to find a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.room}" with ID ${this.id}.`)
         }
     }
 
@@ -104,8 +164,10 @@ module.exports = class Room {
      * @param {Player} player The Player instance to make the host.
      */
     setHost(player) {
-        this.host = player;
-        console.log(`Host of Room "${this.name}" with ID ${this.id} set to the Player "${this.host.common.name}" with IP ${this.host.ip}.`);
+        if (player !== undefined) {
+            this.host = player;
+            console.log(`Host of Room "${this.name}" with ID ${this.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
+        }
     }
 
     /**
@@ -133,9 +195,12 @@ module.exports = class Room {
     }
 
     /**
-     * Sets a timeout to remove an empty room.
+     * Invoked to set a timeout to remove an empty room.
      */
     setEmptyTimeout() {
+        if (this.myTimeout !== undefined) {
+            clearTimeout(this.myTimeout);
+        }
         this.myTimeout = setTimeout((obj) => {
             if (obj.players.length === 0) {
                 console.log(`No players are present in room "${obj.name}" with ID ${obj.id}. Removing...`);

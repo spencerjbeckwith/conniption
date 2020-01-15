@@ -18,11 +18,12 @@ const RoomManager = {
      * @param {String} creatorName The name used by the Player who requested the room. Will be the first host when they connect.
      * @param {[Number]} maxPlayers Maximum number of players who can connect to the room.
      * @param {[String]} passcode An optional passcode needed to connect to the room.
-     * @returns {Number} The ID of the new room.
+     * @returns {Number|undefined} The ID of the new room, or undefined if it fails.
      */
     addRoom(name,creatorName,maxPlayers = Config.get().DefaultPlayersPerRoom,passcode = "") {
         if (name === "") {
-            throw `Room name must not be empty!`;
+            console.warn(`Room name must not be empty!`);
+            return undefined;
         }
         let room = new Room(name,creatorName,maxPlayers,passcode);
         this.list.push(room);
@@ -33,7 +34,7 @@ const RoomManager = {
     /**
      * Returns a specific Room instance.
      * @param {Number|String} arg Either the name or the ID of the Room you want to find.
-     * @returns {Room} The Room instance associated with the name and ID.
+     * @returns {Room|undefined} The Room instance associated with the name and ID, or undefined if the room couldn't be found.
      */
     getRoom(arg) {
         for (let i = 0; i < this.list.length; i++) {
@@ -41,7 +42,8 @@ const RoomManager = {
                 return this.list[i];
             }
         }
-        throw `No Room exists with name or ID "${arg}"!`;
+        console.warn(`No Room exists with name or ID "${arg}"!`);
+        return undefined;
     },
 
     /**
@@ -158,6 +160,10 @@ function launchServer() {
 
         ws.on("close",() => {
             //Disconnect/remove client
+            if (ws.myRoom !== undefined) {
+                let obj = ws.myRoom.getPlayer(ws);
+                obj.room.lostPlayer(obj);
+            }
         });
     });
 }
@@ -209,6 +215,7 @@ function launch(file = "config/config.json") {
 }
 
 module.exports = {
+    WebSocket: WebSocket,
     Config: Config,
     Utility: Utility,
     Packet: Packet,

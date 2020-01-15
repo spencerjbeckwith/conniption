@@ -64,6 +64,7 @@ function connect(roomRequest) {
 
     ws.addEventListener("close",() => {
         p.textContent = "Connection closed.";
+        let roomID = 0;
     });
 
     ws.addEventListener("error",(error) => {
