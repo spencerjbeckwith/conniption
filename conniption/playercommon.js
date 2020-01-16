@@ -1,9 +1,7 @@
 module.exports = class PlayerCommon {
     constructor(name) {
+        this.id = Math.floor(Math.random()*100000000);
         this.name = name;
-    }
-
-    getSendable() {
-        return JSON.stringify(this);
+        this.isHost = false;
     }
 }

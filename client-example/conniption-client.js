@@ -13,6 +13,45 @@ class Packet {
     }
 }
 
+class PlayerCommon {
+    constructor(obj) {
+        this.id = obj.id;
+        this.name = obj.name;
+        this.isHost = obj.isHost;
+    }
+}
+
+const Game = {
+    players: [],
+
+    addPlayer(playercommon) {
+        let o = new PlayerCommon(playercommon);
+        this.players.push(o);
+        return o;
+    },
+
+    addFromObject() {
+
+    },
+
+    getPlayer() {
+
+    },
+
+    removePlayer(playercommon) {
+        let index = this.players.indexOf(playercommon);
+        if (index !== -1) {
+            this.players.splice(this.players.indexOf(playercommon),1);
+        }
+    },
+
+    removeAll() {
+        for (let i = 0; i < this.players.length; i++) {
+            this.removePlayer(this.players[i]);
+        }
+    }
+}
+
 let PacketCallbacks = {};
 /**
  * Adds a new handling function when the server receives a packet of a certain type.
@@ -127,4 +166,8 @@ addPacketType("refusal",(ws,receivedPacket) => {
     console.error(`Connection refused: ${receivedPacket.message}`);
     p.textContent = receivedPacket.message;
     ws.close();
+});
+
+addPacketType("players",(ws,receivedPacket) => {
+    console.log(JSON.parse(receivedPacket.message));
 });

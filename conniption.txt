@@ -29,17 +29,27 @@ connect("join") will join the room with the same ID as our roomID variable.
 
 
 To do:
--Player disconnection
--Sending other players to other clients. A client-side PlayerCommon class, maybe?
--Player session saving
+-make the client game object accept and acknowledge the playercommon list. - handle "players" packet
+	-youll probably have to work harder on the Game object... in a client, that is.
+-make lost/found clients act appropriately - sending a connect/disconnect packet
+-preface all conniption internal packets with _ or something.
+-functions for changing progress state of a room?
+	-Game Pause, Game Stop, etc.
 -Blacklist and whitelist stuff
 -DOCUMENT EVERYTHING!!
+
+-maybe: make players and rooms extend the event class thing? so they can trigger events of their own.
 
 -fill in all them empty functions...
 -assess what functionality is missing in this, from the earlier project.
 	-look at the old config file
 -commands n shit
+	-global commands, and commands only usable by a host.
 -new kind of Packet: a JSONPacket that holds a JSON object by default, instead of just a message.
 -how to make a player? and how to make the player easily extensible? ooh.
 	-how to extend it at all? It has something to do with modifying prototypes, yes?
 -how to make an easy client-side framework that can be used in pure JS?
+
+thoughts for the future:
+	-how can a player timing out send more updates about how long they have left to reconnect?
+		-this would probably need a new timer in player.lost()

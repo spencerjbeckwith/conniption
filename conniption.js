@@ -197,7 +197,6 @@ addPacketType("join",(ws,receivedPacket) => {
         let room = RoomManager.getRoom(id);
         room.addPlayer(receivedPacket.sender,ws,ws._socket.remoteAddress);
         new Packet("join").send(ws);
-        //Let other clients know about each other, HERE
     }
     catch (error) {
         throw `Player could not join Room with ID "${id}": ${error}`;

@@ -1,6 +1,7 @@
 const Config = require("./config.js");
 const Utility = require("./utility.js");
 const Player = require("./player.js");
+const Packet = require("./packet.js");
 module.exports = class Room {
     constructor(name,creatorName,maxPlayers,passcode = "") {
         this.id = Math.floor(Math.random()*1000000000);
@@ -84,6 +85,7 @@ module.exports = class Room {
         if (this.host === name) { //Our host connected!
             this.setHost(player);
         }
+        this.sendSelf();
     }
 
     /**
@@ -112,10 +114,12 @@ module.exports = class Room {
      * @param {Player} player The player to remove.
      */
     removePlayer(player) {
-        if (player !== undefined) {
+        let index = this.players.indexOf(player);
+        if (index !== -1) {
             console.log(`${player.common.name} has disconnected.`);
             player.remove();
-            this.players.splice(this.players.indexOf(player),1);
+            this.players.splice(index,1);
+            this.sendSelf();
 
             //Are we empty? Set our timeout?
             if (this.players.length === 0) {
@@ -164,8 +168,13 @@ module.exports = class Room {
      * @param {Player} player The Player instance to make the host.
      */
     setHost(player) {
+        //Unset our old host, if we had one.
+        for (let p = 0; p < this.players.length; p++) {
+            this.players[p].common.isHost = false;
+        }
         if (player !== undefined) {
             this.host = player;
+            player.common.isHost = true;
             console.log(`Host of Room "${this.name}" with ID ${this.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
         }
     }
@@ -178,8 +187,30 @@ module.exports = class Room {
         return this.host;
     }
 
-    sendAll() {
+    /**
+     * Sends an array of all PlayerCommons in the room, for use by the players connected.
+     */
+    sendSelf() {
+        let array = [];
+        for (let p = 0; p < this.players.length; p++) {
+            array.push(this.players[p].common);
+        }
+        
+        let packet = new Packet("players",JSON.stringify(array));
+        this.sendAll(packet);
+    }
 
+    /**
+     * Sends a packet to all the players connected to this room, with the option to exclude one if needed.
+     * @param {Packet} packet The packet to send.
+     * @param {[WebSocket]} ws An optional WebSocket to exclude from the sending.
+     */
+    sendAll(packet,ws = undefined) {
+        for (let p = 0; p < this.players.length; p++) {
+            if (this.players[p].ws !== ws) {
+                this.players[p].send(packet);
+            }
+        }
     }
 
     pingAll() {
@@ -187,10 +218,6 @@ module.exports = class Room {
     }
 
     broadcast() {
-
-    }
-
-    getSendable() {
 
     }
 
