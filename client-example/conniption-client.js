@@ -1,21 +1,17 @@
 class Packet {
     constructor(type,message = "") {
-        this.sender = name;
         this.type = type;
         this.message = message;
+        
+        //To identify this client.
+        this.sender = name;
         this.room = roomID;
-        this.JSON = false;
     }
 
     send(ws) {
         if (ws.readyState === 1) {
             ws.send(JSON.stringify(this));
         }
-    }
-
-    setObject(obj) {
-        this.JSON = true;
-        this.message = JSON.stringify(obj);
     }
 }
 
@@ -88,11 +84,12 @@ function connect(roomRequest) {
             }
             case ("make"): {
                 console.log("Requesting to make a new room...")
-                new Packet("--make",JSON.stringify({
+                let packet = new Packet("--make",{
                     name: roomRequestName,
                     maxPlayers: roomRequestMaxPlayers,
                     passcode: roomRequestPasscode
-                })).send(ws);
+                });
+                packet.send(ws);
                 break;
             }
             case ("join"): {
@@ -117,30 +114,24 @@ function connect(roomRequest) {
     });
 
     ws.addEventListener("message",(message) => {
-        let receivedPacket = {};
+        let rc = {};
         try {
-            receivedPacket = JSON.parse(message.data);
+            rc = JSON.parse(message.data);
         }
         catch (error) {
-            receivedPacket.type = "__INVALID__";
+            rc.type = "__INVALID__";
         }
         try {
-            if (receivedPacket.type === "__INVALID__") {
+            if (rc.type === "__INVALID__") {
                 throw `Packet could not be parsed`;
             }
 
-            //See if it was a JSON Packet
-            let packetObject = {};
-            if (receivedPacket.JSON) {
-                packetObject = JSON.parse(receivedPacket.message);
-            }
-
-            if (PacketCallbacks[receivedPacket.type]) {
-                PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
-                    packetFunction(ws,receivedPacket,packetObject);
+            if (PacketCallbacks[rc.type]) {
+                PacketCallbacks[rc.type].forEach((packetFunction) => {
+                    packetFunction(ws,rc);
                 });
             } else {
-                throw `Received unidentifiable packet type: ${receivedPacket.type}`
+                throw `Received unidentifiable packet type: ${rc.type}`
             }
         }
         catch (error) {
@@ -152,37 +143,31 @@ function connect(roomRequest) {
     });
 }
 
-addPacketType("--fetch",(ws,receivedPacket) => {
-    let roomList = [];
-    try {
-        roomList = JSON.parse(receivedPacket.message);
-    }
-    catch (error) {
-        throw `Unable to parse room list.`;
-    }
+addPacketType("--fetch",(ws,rc) => {
+    let roomList = rc.message;
     console.log(roomList);
 });
 
-addPacketType("--make",(ws,receivedPacket) => {
-    console.log("Our room is room ID "+receivedPacket.message+"! Connecting...");
-    roomID = receivedPacket.message;
+addPacketType("--make",(ws,rc) => {
+    console.log("Our room is room ID "+rc.message+"! Connecting...");
+    roomID = rc.message;
     new Packet("--join",roomID).send(ws);
 });
 
-addPacketType("--join",(ws,receivedPacket) => {
+addPacketType("--join",(ws,rc) => {
     console.log("We joined the game!");
     p.textContent = "We joined the game!";
     document.querySelector("input").value = roomID;
 });
 
-addPacketType("--refusal",(ws,receivedPacket) => {
-    console.error(`Connection refused: ${receivedPacket.message}`);
-    p.textContent = receivedPacket.message;
+addPacketType("--refusal",(ws,rc) => {
+    console.error(`Connection refused: ${rc.message}`);
+    p.textContent = rc.message;
     ws.close();
 });
 
-addPacketType("--players",(ws,receivedPacket) => {
-    console.log(JSON.parse(receivedPacket.message));
+addPacketType("--players",(ws,rc) => {
+    console.log(rc.message);
 });
 
 //client example functionality
@@ -193,6 +178,6 @@ document.querySelector("button.make").addEventListener("click",() => {
 });
 document.querySelector("button.join").addEventListener("click",() => {
     roomID = document.querySelector("input").value;
-    console.log("Joing room with ID "+roomID+"...");
+    console.log("Joining room with ID "+roomID+"...");
     connect("join");
 });

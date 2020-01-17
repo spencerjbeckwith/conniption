@@ -38,7 +38,7 @@ const RoomManager = {
      */
     getRoom(arg) {
         for (let i = 0; i < this.list.length; i++) {
-            if (this.list[i].id === arg || this.list[i].name === arg) {
+            if (this.list[i].id == arg || this.list[i].name === arg) {
                 return this.list[i];
             }
         }
@@ -72,7 +72,7 @@ const RoomManager = {
 
     /**
      * Returns an array of all Rooms currently present on the server, to be sent on a fetch packet.
-     * @returns {String} A stringified JSON array holding objects of each current Room.
+     * @returns {Array} An array holding objects of each current Room.
      */
     getSendable() {
         let returnObject = [];
@@ -86,7 +86,7 @@ const RoomManager = {
                 inProgress: this.list[i].inProgress
             }
         }
-        return JSON.stringify(returnObject);
+        return returnObject;
     }
 }
 
@@ -127,31 +127,25 @@ function launchServer() {
         }
 
         ws.on("message",(data) => {
-            let receivedPacket = {};
+            let rc = {};
             try {
-                receivedPacket = JSON.parse(data);
+                rc = JSON.parse(data);
             }
             catch (error) {
-                receivedPacket.type = "__INVALID__";
+                rc.type = "__INVALID__";
             }
             try {
-                if (receivedPacket.type === "__INVALID__") {
+                if (rc.type === "__INVALID__") {
                     throw `Packet could not be parsed`;
                 }
 
-                //See if it was a JSON Packet
-                let packetObject = {};
-                if (receivedPacket.JSON) {
-                    packetObject = JSON.parse(receivedPacket.message);
-                }
-
                 //Call correct packet function(s) for the type
-                if (PacketCallbacks[receivedPacket.type]) {
-                    PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
-                        packetFunction(ws,receivedPacket,packetObject);
+                if (PacketCallbacks[rc.type]) {
+                    PacketCallbacks[rc.type].forEach((packetFunction) => {
+                        packetFunction(ws,rc);
                     });
                 } else {
-                    throw `Received unidentifiable packet type: ${receivedPacket.type}`
+                    throw `Received unidentifiable packet type: ${rc.type}`
                 }
             }
             catch (error) {
@@ -179,22 +173,22 @@ addPacketType("--fetch",(ws) => {
 });
 
 //Make packet: Make a new room, send it back to the requester to connect.
-addPacketType("--make",(ws,receivedPacket,packetObject) => {
+addPacketType("--make",(ws,rc) => {
     clearTimeout(ws.roomRequestTimeout);
-    let newID = RoomManager.addRoom(packetObject.name,receivedPacket.sender,packetObject.maxPlayers,packetObject.passcode);
+    let newID = RoomManager.addRoom(rc.message.name,rc.sender,rc.message.maxPlayers,rc.message.passcode);
     new Packet("--make",newID).send(ws);
 });
 
 //Join packet: Try to add the requester to their specified Room.
-addPacketType("--join",(ws,receivedPacket) => {
+addPacketType("--join",(ws,rc) => {
     clearTimeout(ws.roomRequestTimeout);
-    let id = receivedPacket.room;
+    let id = rc.room;
     try {
         let room = RoomManager.getRoom(id);
         if (room === undefined) {
             throw `That room does not exist!`;
         }
-        room.addPlayer(receivedPacket.sender,ws,ws._socket.remoteAddress);
+        room.addPlayer(rc.sender,ws,ws._socket.remoteAddress);
         new Packet("--join").send(ws);
     }
     catch (error) {
