@@ -7,6 +7,7 @@ module.exports = class Packet {
     constructor(type,message = "") {
         this.type = type;
         this.message = message;
+        this.JSON = false;
     }
 
     /**
@@ -17,5 +18,10 @@ module.exports = class Packet {
         if (ws.readyState === 1) {
             ws.send(JSON.stringify(this));
         }
+    }
+
+    setObject(obj) {
+        this.JSON = true;
+        this.message = JSON.stringify(obj);
     }
 }

@@ -196,7 +196,7 @@ module.exports = class Room {
             array.push(this.players[p].common);
         }
         
-        let packet = new Packet("players",JSON.stringify(array));
+        let packet = new Packet("--players",JSON.stringify(array));
         this.sendAll(packet);
     }
 

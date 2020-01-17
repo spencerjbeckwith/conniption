@@ -54,6 +54,8 @@ module.exports = class Player {
         this.reconnectionTimeout = setTimeout((obj) => {
             obj.room.removePlayer(obj);
         },Config.get().Users.ReconnectionTimeout*1000,this);
+
+        //send lost packet
     }
 
     /**
@@ -63,5 +65,7 @@ module.exports = class Player {
         this.connected = true;
         clearTimeout(this.reconnectionTimeout);
         this.reconnectionTimeout = undefined;
+
+        //send found packet
     }
 }

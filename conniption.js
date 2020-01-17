@@ -139,10 +139,16 @@ function launchServer() {
                     throw `Packet could not be parsed`;
                 }
 
+                //See if it was a JSON Packet
+                let packetObject = {};
+                if (receivedPacket.JSON) {
+                    packetObject = JSON.parse(receivedPacket.message);
+                }
+
                 //Call correct packet function(s) for the type
                 if (PacketCallbacks[receivedPacket.type]) {
                     PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
-                        packetFunction(ws,receivedPacket);
+                        packetFunction(ws,receivedPacket,packetObject);
                     });
                 } else {
                     throw `Received unidentifiable packet type: ${receivedPacket.type}`
@@ -150,10 +156,7 @@ function launchServer() {
             }
             catch (error) {
                 console.error(`Error receiving data: ${error}`);
-                if (error.fileName !== undefined && error.lineNumber !== undefined) { //Does this check actually do anything?
-                    console.log(`Error occured at: ${error.fileName} >> ${error.lineNumber}`);
-                }
-                new Packet("refusal",error).send(ws);
+                new Packet("--refusal",error).send(ws);
                 ws.close();
             }
         });
@@ -169,34 +172,30 @@ function launchServer() {
 }
 
 //Fetch packet: return our list of Rooms.
-addPacketType("fetch",(ws) => {
+addPacketType("--fetch",(ws) => {
     clearTimeout(ws.roomRequestTimeout);
-    new Packet("fetch",RoomManager.getSendable()).send(ws);
+    new Packet("--fetch",RoomManager.getSendable()).send(ws);
     ws.close();
 });
 
 //Make packet: Make a new room, send it back to the requester to connect.
-addPacketType("make",(ws,receivedPacket) => {
+addPacketType("--make",(ws,receivedPacket,packetObject) => {
     clearTimeout(ws.roomRequestTimeout);
-    let obj;
-    try {
-        obj = JSON.parse(receivedPacket.message)
-    }
-    catch {
-        throw `Could not parse the make request.`;
-    }
-    let newID = RoomManager.addRoom(obj.name,receivedPacket.sender,obj.maxPlayers,obj.passcode);
-    new Packet("make",newID).send(ws);
+    let newID = RoomManager.addRoom(packetObject.name,receivedPacket.sender,packetObject.maxPlayers,packetObject.passcode);
+    new Packet("--make",newID).send(ws);
 });
 
 //Join packet: Try to add the requester to their specified Room.
-addPacketType("join",(ws,receivedPacket) => {
+addPacketType("--join",(ws,receivedPacket) => {
     clearTimeout(ws.roomRequestTimeout);
     let id = receivedPacket.room;
     try {
         let room = RoomManager.getRoom(id);
+        if (room === undefined) {
+            throw `That room does not exist!`;
+        }
         room.addPlayer(receivedPacket.sender,ws,ws._socket.remoteAddress);
-        new Packet("join").send(ws);
+        new Packet("--join").send(ws);
     }
     catch (error) {
         throw `Player could not join Room with ID "${id}": ${error}`;

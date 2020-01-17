@@ -4,12 +4,18 @@ class Packet {
         this.type = type;
         this.message = message;
         this.room = roomID;
+        this.JSON = false;
     }
 
     send(ws) {
         if (ws.readyState === 1) {
             ws.send(JSON.stringify(this));
         }
+    }
+
+    setObject(obj) {
+        this.JSON = true;
+        this.message = JSON.stringify(obj);
     }
 }
 
@@ -77,12 +83,12 @@ function connect(roomRequest) {
         switch (roomRequest) {
             case ("fetch"): {
                 console.log("Fetching game rooms...");
-                new Packet("fetch").send(ws);
+                new Packet("--fetch").send(ws);
                 break;
             }
             case ("make"): {
                 console.log("Requesting to make a new room...")
-                new Packet("make",JSON.stringify({
+                new Packet("--make",JSON.stringify({
                     name: roomRequestName,
                     maxPlayers: roomRequestMaxPlayers,
                     passcode: roomRequestPasscode
@@ -91,7 +97,7 @@ function connect(roomRequest) {
             }
             case ("join"): {
                 console.log("Requesting to join a room...");
-                new Packet("join",roomID).send(ws);
+                new Packet("--join",roomID).send(ws);
                 break;
             }
             default: {
@@ -103,7 +109,7 @@ function connect(roomRequest) {
 
     ws.addEventListener("close",() => {
         p.textContent = "Connection closed.";
-        let roomID = 0;
+        roomID = "__INVALID__";
     });
 
     ws.addEventListener("error",(error) => {
@@ -123,9 +129,15 @@ function connect(roomRequest) {
                 throw `Packet could not be parsed`;
             }
 
+            //See if it was a JSON Packet
+            let packetObject = {};
+            if (receivedPacket.JSON) {
+                packetObject = JSON.parse(receivedPacket.message);
+            }
+
             if (PacketCallbacks[receivedPacket.type]) {
                 PacketCallbacks[receivedPacket.type].forEach((packetFunction) => {
-                    packetFunction(ws,receivedPacket);
+                    packetFunction(ws,receivedPacket,packetObject);
                 });
             } else {
                 throw `Received unidentifiable packet type: ${receivedPacket.type}`
@@ -140,7 +152,7 @@ function connect(roomRequest) {
     });
 }
 
-addPacketType("fetch",(ws,receivedPacket) => {
+addPacketType("--fetch",(ws,receivedPacket) => {
     let roomList = [];
     try {
         roomList = JSON.parse(receivedPacket.message);
@@ -151,23 +163,36 @@ addPacketType("fetch",(ws,receivedPacket) => {
     console.log(roomList);
 });
 
-addPacketType("make",(ws,receivedPacket) => {
+addPacketType("--make",(ws,receivedPacket) => {
     console.log("Our room is room ID "+receivedPacket.message+"! Connecting...");
     roomID = receivedPacket.message;
-    new Packet("join",roomID).send(ws);
+    new Packet("--join",roomID).send(ws);
 });
 
-addPacketType("join",(ws,receivedPacket) => {
+addPacketType("--join",(ws,receivedPacket) => {
     console.log("We joined the game!");
     p.textContent = "We joined the game!";
+    document.querySelector("input").value = roomID;
 });
 
-addPacketType("refusal",(ws,receivedPacket) => {
+addPacketType("--refusal",(ws,receivedPacket) => {
     console.error(`Connection refused: ${receivedPacket.message}`);
     p.textContent = receivedPacket.message;
     ws.close();
 });
 
-addPacketType("players",(ws,receivedPacket) => {
+addPacketType("--players",(ws,receivedPacket) => {
     console.log(JSON.parse(receivedPacket.message));
+});
+
+//client example functionality
+
+document.querySelector("button.make").addEventListener("click",() => {
+    console.log("Attempting to make a game...");
+    connect("make");
+});
+document.querySelector("button.join").addEventListener("click",() => {
+    roomID = document.querySelector("input").value;
+    console.log("Joing room with ID "+roomID+"...");
+    connect("join");
 });
