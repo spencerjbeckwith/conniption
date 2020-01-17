@@ -14,6 +14,8 @@ module.exports = class Room {
         this.manager = undefined;
         this.host = creatorName;
 
+        //gamecommon can go here.
+
         console.log(`New room "${this.name}" created with ID ${this.id}. Waiting for players...`);
         this.myTimeout = undefined;
         this.setEmptyTimeout();
@@ -41,12 +43,15 @@ module.exports = class Room {
             throw `Name invalid! Must be ${Config.get().Users.Name.MinLength} to ${Config.get().Users.Name.MaxLength} characters long and must not contain any special characters.`;
         }
 
-        if (this.getPlayer(name) !== undefined) {
-            let obj = this.getPlayer(name);
-            if (!obj.connected && obj.common.name === name && obj.ip === ip && obj.room === this) {
-                //Found a lost player
-                this.foundPlayer(obj);
-                return;
+        for (let p = 0; p < this.players.length; p++) {
+            let obj = this.players[p];
+            if (!obj.common.connected) { //We looking for any reconnections?
+                if (obj.common.name === name && obj.ip === ip && obj.room === this) {
+                    console.log(`Player ${obj.common.name} has reconnected!`);
+                    obj.found(ws);
+                    this.sendSelf();
+                    return;
+                }
             }
         }
 
@@ -85,7 +90,7 @@ module.exports = class Room {
         if (this.host === name) { //Our host connected!
             this.setHost(player);
         }
-        this.sendSelf();
+        this.sendSelf(`${name} has connected!`);
     }
 
     /**
@@ -116,10 +121,9 @@ module.exports = class Room {
     removePlayer(player) {
         let index = this.players.indexOf(player);
         if (index !== -1) {
-            console.log(`${player.common.name} has disconnected.`);
             player.remove();
             this.players.splice(index,1);
-            this.sendSelf();
+            this.sendSelf(`${player.common.name} has disconnected.`);
 
             //Are we empty? Set our timeout?
             if (this.players.length === 0) {
@@ -149,21 +153,6 @@ module.exports = class Room {
     }
 
     /**
-     * Invoked when a player who lost their connection reconnects to the room.
-     * @param {Player} player The player who has reconnected.
-     */
-    foundPlayer(player) {
-        if (player !== undefined) {
-            if (this.inProgress && !player.connected) {
-                console.log(`Player ${player.common.name} has reconnected!`);
-                player.found();
-            }
-        } else {
-            console.warn(`Tried to find a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.room}" with ID ${this.id}.`)
-        }
-    }
-
-    /**
      * Sets a new host for this Room.
      * @param {Player} player The Player instance to make the host.
      */
@@ -189,14 +178,22 @@ module.exports = class Room {
 
     /**
      * Sends an array of all PlayerCommons in the room, for use by the players connected.
+     * @param {[String]} message An optional message to send alongside the array, to all players.
      */
-    sendSelf() {
+    sendSelf(message = "") {
+        if (message !== "") {
+            console.log(message);
+        }
         let array = [];
         for (let p = 0; p < this.players.length; p++) {
             array.push(this.players[p].common);
         }
         
-        let packet = new Packet("--players",array);
+        let packet = new Packet("--players",{
+            //add our gamecommon here.
+            message: message,
+            array: array
+        });
         this.sendAll(packet);
     }
 

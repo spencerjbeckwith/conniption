@@ -127,25 +127,25 @@ function launchServer() {
         }
 
         ws.on("message",(data) => {
-            let rc = {};
+            let rp = {};
             try {
-                rc = JSON.parse(data);
+                rp = JSON.parse(data);
             }
             catch (error) {
-                rc.type = "__INVALID__";
+                rp.type = "__INVALID__";
             }
             try {
-                if (rc.type === "__INVALID__") {
+                if (rp.type === "__INVALID__") {
                     throw `Packet could not be parsed`;
                 }
 
                 //Call correct packet function(s) for the type
-                if (PacketCallbacks[rc.type]) {
-                    PacketCallbacks[rc.type].forEach((packetFunction) => {
-                        packetFunction(ws,rc);
+                if (PacketCallbacks[rp.type]) {
+                    PacketCallbacks[rp.type].forEach((packetFunction) => {
+                        packetFunction(ws,rp);
                     });
                 } else {
-                    throw `Received unidentifiable packet type: ${rc.type}`
+                    throw `Received unidentifiable packet type: ${rp.type}`
                 }
             }
             catch (error) {
@@ -173,27 +173,32 @@ addPacketType("--fetch",(ws) => {
 });
 
 //Make packet: Make a new room, send it back to the requester to connect.
-addPacketType("--make",(ws,rc) => {
+addPacketType("--make",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
-    let newID = RoomManager.addRoom(rc.message.name,rc.sender,rc.message.maxPlayers,rc.message.passcode);
+    let newID = RoomManager.addRoom(rp.message.name,rp.sender,rp.message.maxPlayers,rp.message.passcode);
     new Packet("--make",newID).send(ws);
 });
 
 //Join packet: Try to add the requester to their specified Room.
-addPacketType("--join",(ws,rc) => {
+addPacketType("--join",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
-    let id = rc.room;
+    let id = rp.room;
     try {
         let room = RoomManager.getRoom(id);
         if (room === undefined) {
             throw `That room does not exist!`;
         }
-        room.addPlayer(rc.sender,ws,ws._socket.remoteAddress);
+        room.addPlayer(rp.sender,ws,ws._socket.remoteAddress);
         new Packet("--join").send(ws);
     }
     catch (error) {
         throw `Player could not join Room with ID "${id}": ${error}`;
     }
+});
+
+addPacketType("--start",(ws,rp) => {
+    let id = rp.room;
+    id.inProgress = rp.message;
 });
 
 //Put default packet types here.

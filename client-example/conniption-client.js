@@ -20,37 +20,21 @@ class PlayerCommon {
         this.id = obj.id;
         this.name = obj.name;
         this.isHost = obj.isHost;
+        this.connected = true;
     }
 }
 
 const Game = {
+    common: {},
     players: [],
 
-    addPlayer(playercommon) {
-        let o = new PlayerCommon(playercommon);
-        this.players.push(o);
-        return o;
-    },
-
-    addFromObject() {
-
-    },
-
-    getPlayer() {
-
-    },
-
-    removePlayer(playercommon) {
-        let index = this.players.indexOf(playercommon);
-        if (index !== -1) {
-            this.players.splice(this.players.indexOf(playercommon),1);
-        }
-    },
-
-    removeAll() {
+    getPlayer(id) {
         for (let i = 0; i < this.players.length; i++) {
-            this.removePlayer(this.players[i]);
+            if (this.players[i].id === id) {
+                return this.players[i];
+            }
         }
+        return undefined;
     }
 }
 
@@ -114,24 +98,24 @@ function connect(roomRequest) {
     });
 
     ws.addEventListener("message",(message) => {
-        let rc = {};
+        let rp = {};
         try {
-            rc = JSON.parse(message.data);
+            rp = JSON.parse(message.data);
         }
         catch (error) {
-            rc.type = "__INVALID__";
+            rp.type = "__INVALID__";
         }
         try {
-            if (rc.type === "__INVALID__") {
+            if (rp.type === "__INVALID__") {
                 throw `Packet could not be parsed`;
             }
 
-            if (PacketCallbacks[rc.type]) {
-                PacketCallbacks[rc.type].forEach((packetFunction) => {
-                    packetFunction(ws,rc);
+            if (PacketCallbacks[rp.type]) {
+                PacketCallbacks[rp.type].forEach((packetFunction) => {
+                    packetFunction(ws,rp.message);
                 });
             } else {
-                throw `Received unidentifiable packet type: ${rc.type}`
+                throw `Received unidentifiable packet type: ${rp.type}`
             }
         }
         catch (error) {
@@ -141,43 +125,65 @@ function connect(roomRequest) {
             }
         }
     });
+
+    return ws;
 }
 
-addPacketType("--fetch",(ws,rc) => {
-    let roomList = rc.message;
+addPacketType("--fetch",(ws,message) => {
+    let roomList = message;
     console.log(roomList);
 });
 
-addPacketType("--make",(ws,rc) => {
-    console.log("Our room is room ID "+rc.message+"! Connecting...");
-    roomID = rc.message;
+addPacketType("--make",(ws,message) => {
+    console.log("Our room is room ID "+message+"! Connecting...");
+    roomID = message;
     new Packet("--join",roomID).send(ws);
 });
 
-addPacketType("--join",(ws,rc) => {
+addPacketType("--join",(ws,message) => {
     console.log("We joined the game!");
     p.textContent = "We joined the game!";
     document.querySelector("input").value = roomID;
 });
 
-addPacketType("--refusal",(ws,rc) => {
-    console.error(`Connection refused: ${rc.message}`);
-    p.textContent = rc.message;
+addPacketType("--refusal",(ws,message) => {
+    console.error(`Connection refused: ${message}`);
+    p.textContent = message;
     ws.close();
 });
 
-addPacketType("--players",(ws,rc) => {
-    console.log(rc.message);
+addPacketType("--players",(ws,message) => {
+    if (message.message !== "") {
+        console.log(message.message);
+    }
+    //load a gamecommon here
+    Game.players = message.array;
+});
+
+addPacketType("--player-connection-update",(ws,message) => {
+    let player = Game.getPlayer(message.id);
+    if (player !== undefined) {
+        player.connected = message.status;
+        if (message.status) {
+            console.log(`${player.name} has reconnected!`);
+        } else {
+            console.log(`Waiting for ${player.name} to reconnect...`);
+        }
+    }
 });
 
 //client example functionality
 
+document.querySelector("button.fetch").addEventListener("click",() => {
+    connect("fetch");
+});
 document.querySelector("button.make").addEventListener("click",() => {
-    console.log("Attempting to make a game...");
     connect("make");
 });
 document.querySelector("button.join").addEventListener("click",() => {
     roomID = document.querySelector("input").value;
-    console.log("Joining room with ID "+roomID+"...");
     connect("join");
+});
+document.querySelector("button.disconnect").addEventListener("click",() => {
+    //send a quit packet
 });

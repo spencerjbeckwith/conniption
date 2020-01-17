@@ -1,5 +1,6 @@
 const Config = require("./config.js");
 const PlayerCommon = require("./playercommon.js");
+const Packet = require("./packet.js");
 module.exports = class Player {
     /**
      * Creates a new instance of a Player.
@@ -9,7 +10,6 @@ module.exports = class Player {
      * @param {Number} room The room ID this player has joined.
      */
     constructor(name,ws,ip,room) {
-        this.connected = true;
         this.ws = ws;
         this.ip = ip;
         this.room = room;
@@ -32,8 +32,12 @@ module.exports = class Player {
         this.ws.close();
     }
 
+    /**
+     * Sends a packet to this player.
+     * @param {Packet} packet The packet to send.
+     */
     send(packet) {
-        if (this.connected && this.ws !== undefined) {
+        if (this.common.connected && this.ws !== undefined) {
             packet.send(this.ws);
         }
     }
@@ -50,22 +54,33 @@ module.exports = class Player {
      * Invoked on a player when their connection is lost, and you want them to have the chance to reconnect.
      */
     lost() {
-        this.connected = false;
+        this.common.connected = false;
         this.reconnectionTimeout = setTimeout((obj) => {
             obj.room.removePlayer(obj);
         },Config.get().Users.ReconnectionTimeout*1000,this);
 
         //send lost packet
+        this.room.sendAll(new Packet("--player-connection-update",{
+            id: this.common.id,
+            status: false
+        }),this.ws);
     }
 
     /**
      * Invoked on a player who lost their connection, when they reconnect.
+     * @param {WebSocket} ws The new WebSocket the client has connected from.
      */
-    found() {
-        this.connected = true;
+    found(ws) {
+        this.common.connected = true;
         clearTimeout(this.reconnectionTimeout);
         this.reconnectionTimeout = undefined;
 
+        this.ws = ws;
+
         //send found packet
+        this.room.sendAll(new Packet("--player-connection-update",{
+            id: this.common.id,
+            status: true
+        }),this.ws);
     }
 }
