@@ -174,6 +174,9 @@ function launchServer() {
 //Fetch packet: return our list of Rooms.
 addPacketType("--fetch",(ws) => {
     clearTimeout(ws.roomRequestTimeout);
+    if (!Config.checkAllowed(ws._socket.remoteAddress)) {
+        throw `You are not allowed to connect to this server.`;
+    }
     new Packet("--fetch",RoomManager.getSendable()).send(ws);
     new Packet("--refusal",`Fetching complete.`).send(ws);
     ws.close();
@@ -182,6 +185,9 @@ addPacketType("--fetch",(ws) => {
 //Make packet: Make a new room, send it back to the requester to connect.
 addPacketType("--make",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
+    if (!Config.checkAllowed(ws._socket.remoteAddress)) {
+        throw `You are not allowed to connect to this server.`;
+    }
     let newID = RoomManager.addRoom(rp.message.name,rp.id,rp.message.maxPlayers,rp.message.passcode);
     new Packet("--make",newID).send(ws);
     new Packet("--refusal",`Making complete.`).send(ws);
@@ -191,6 +197,9 @@ addPacketType("--make",(ws,rp) => {
 //Join packet: Try to add the requester to their specified Room.
 addPacketType("--join",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
+    if (!Config.checkAllowed(ws._socket.remoteAddress)) {
+        throw `You are not allowed to connect to this server.`;
+    }
     let roomID = rp.room;
     try {
         let room = RoomManager.getRoom(roomID);

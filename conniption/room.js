@@ -76,8 +76,6 @@ module.exports = class Room {
             }
         }
 
-        //check blacklist and whitelist here!!!
-
         if (this.getPlayer(ws) !== undefined) {
             throw `WebSocket already taken!`;
         }

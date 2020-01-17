@@ -19,12 +19,7 @@ connect("join") will join the room with the same ID as our roomID variable.
 
 
 To do:
--add constant pings back and forth. client to server, and server to client.
-	-make these pings reset upon receiving any packet. no dead connections during our conniption fit!
-	-upon server being "ponged" the room should send out new Pings of over player
--blacklist and whitelist stuff
 -client-side configuration.
--organize and document the client example.
 -make it so the rooms need the passcode before you can join
 -add gamecommon
 	-if you move variables in here, MAKE SURE to update the rest of the files.

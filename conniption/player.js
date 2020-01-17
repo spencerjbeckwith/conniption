@@ -48,12 +48,20 @@ module.exports = class Player {
         }
     }
 
+    /**
+     * Kicks this player from the server. They are able to reconnect.
+     */
     kick() {
-
+        new Packet("--refusal","You have been removed from the server.").send(this.ws);
+        this.room.removePlayer(this);
     }
 
+    /**
+     * Kicks this player from the server and adds their IP to the BlackList.
+     */
     ban() {
-
+        Config.addToBlackList(`${this.ip} - "${this.common.name}"`);
+        this.kick();
     }
 
     /**
@@ -90,6 +98,9 @@ module.exports = class Player {
         }),this.ws);
     }
 
+    /**
+     * Invoked on a player when a ping packet is sent to them.
+     */
     pinged() {
         if (this.pingTimeout === undefined) {
             this.pingTimeout = setTimeout((obj) => {
@@ -99,6 +110,9 @@ module.exports = class Player {
         }
     }
 
+    /**
+     * Invoked on a player when a pong packet is received from them.
+     */
     ponged() {
         clearTimeout(this.pingTimeout);
         this.pingTimeout = undefined;

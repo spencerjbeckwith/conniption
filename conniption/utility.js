@@ -24,8 +24,6 @@ function nameIsValid(name) {
     return true;
 }
 
-//Whitelist and blacklist functions should go here.
-
 module.exports = {
     nameIsValid: nameIsValid
 }

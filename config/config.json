@@ -5,8 +5,8 @@
     "DefaultPlayersPerRoom": 4,
     "MaxPlayersPerRoom": 10,
     "AllowJoinInProgress": false,
-    "UseWhitelist": false,
-    "UseBlacklist": false,
+    "UseWhiteList": false,
+    "UseBlackList": false,
     "Users": {
         "Name": {
             "MinLength": 3,
