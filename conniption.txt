@@ -47,3 +47,4 @@ thoughts for the future:
 		-maybe a future update can divide games into their own processes? And the hub just directs messages to the proper game, much like it will have to.
 	-remember that future functionality is based entirely on this package... so don't fully deprecate anything
 		-also means all names need to stay relevant and accurate to what they describe.
+	-how can more language support be added? Maybe... similarly to a config file?

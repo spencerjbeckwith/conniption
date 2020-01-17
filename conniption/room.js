@@ -40,7 +40,7 @@ module.exports = class Room {
      */
     addPlayer(name,ws,ip) {
         if (!Utility.nameIsValid(name)) {
-            throw `Name invalid! Must be ${Config.get().Users.Name.MinLength} to ${Config.get().Users.Name.MaxLength} characters long and must not contain any special characters.`;
+            throw `Name "${name}" invalid! Must be ${Config.get().Users.Name.MinLength} to ${Config.get().Users.Name.MaxLength} characters long and must not contain any special characters.`;
         }
 
         for (let p = 0; p < this.players.length; p++) {
@@ -86,23 +86,25 @@ module.exports = class Room {
         this.players.push(player);
         ws.myRoom = this;
         ws.myPlayer = player;
-        console.log(`Player "${name}" with IP ${ip} has joined Room "${this.name}" with ID ${this.id}.`);
+        console.log(`Player "${player.common.name}" with ID ${player.common.id} and IP ${player.ip} has joined Room "${this.name}" with ID ${this.id}.`);
         if (this.host === name) { //Our host connected!
             this.setHost(player);
         }
         this.sendSelf(`${name} has connected!`);
+
+        return player;
     }
 
     /**
      * Returns a Player instance with the specified argument, if it is connected to this Room.
-     * @param {String|WebSocket} arg Either the name or WebSocket of the Player you are trying to find.
+     * @param {Number|WebSocket} arg Either the ID or WebSocket of the Player you are trying to find.
      * @returns {Player} Returns the Player instance, or undefined if none is found.
      */
     getPlayer(arg) {
         let check;
         for (let p = 0; p < this.players.length; p++) {
-            if (typeof arg === "string") {
-                check = this.players[p].common.name;
+            if (typeof arg === "number") {
+                check = this.players[p].common.id;
             } else {
                 check = this.players[p].ws;
             }
@@ -130,7 +132,7 @@ module.exports = class Room {
                 this.setEmptyTimeout();
             }
         } else {
-            console.warn(`Tried to remove a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.name}" with ID ${this.id}.`);
+            console.warn(`Tried to remove a player that doesn't exist in the Room ID ${this.id}!`);
         }
     }
 
@@ -148,7 +150,7 @@ module.exports = class Room {
                 this.removePlayer(player);
             }
         } else {
-            console.warn(`Tried to lose a player that doesn't exist in this room! Argument: "${player.common.name}" of room "${this.name}" with ID ${this.id}.`);
+            console.warn(`Tried to lose a player that doesn't exist in the Room ID ${this.id}!`);
         }
     }
 
@@ -164,7 +166,7 @@ module.exports = class Room {
         if (player !== undefined) {
             this.host = player;
             player.common.isHost = true;
-            console.log(`Host of Room "${this.name}" with ID ${this.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
+            console.log(`Host of Room ID ${this.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
         }
     }
 
@@ -210,8 +212,14 @@ module.exports = class Room {
         }
     }
 
+    /**
+     * Sends a ping packet to all players in this room.
+     */
     pingAll() {
+        let packet = new Packet("--ping");
+        this.sendAll(packet);
 
+        //Set the timeouts here
     }
 
     broadcast() {
@@ -227,7 +235,7 @@ module.exports = class Room {
         }
         this.myTimeout = setTimeout((obj) => {
             if (obj.players.length === 0) {
-                console.log(`No players are present in room "${obj.name}" with ID ${obj.id}. Removing...`);
+                console.log(`No players are present in Room ID ${obj.id}. Removing...`);
                 obj.manager.removeRoom(obj.id);
             }
         },Config.get().RoomEmptyTimeout,this);

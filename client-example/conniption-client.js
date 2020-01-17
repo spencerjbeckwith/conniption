@@ -4,7 +4,7 @@ class Packet {
         this.message = message;
         
         //To identify this client.
-        this.sender = name;
+        this.id = id;
         this.room = roomID;
     }
 
@@ -21,6 +21,12 @@ class PlayerCommon {
         this.name = obj.name;
         this.isHost = obj.isHost;
         this.connected = true;
+
+        //Client-side. This is not present in server-side playercommon
+        this.me = false;
+        if (this.id === id) {
+            this.me = true;
+        }
     }
 }
 
@@ -54,6 +60,7 @@ let roomRequestName = "Example Room";
 let roomRequestMaxPlayers = 4;
 let roomRequestPasscode = "";
 let roomID = 0;
+let id = 0;
 
 const p = document.querySelector("p");
 
@@ -72,13 +79,14 @@ function connect(roomRequest) {
                     name: roomRequestName,
                     maxPlayers: roomRequestMaxPlayers,
                     passcode: roomRequestPasscode
+                    //other game configurable game properties would go here
                 });
                 packet.send(ws);
                 break;
             }
             case ("join"): {
                 console.log("Requesting to join a room...");
-                new Packet("--join",roomID).send(ws);
+                new Packet("--join",name).send(ws);
                 break;
             }
             default: {
@@ -137,17 +145,19 @@ addPacketType("--fetch",(ws,message) => {
 addPacketType("--make",(ws,message) => {
     console.log("Our room is room ID "+message+"! Connecting...");
     roomID = message;
-    new Packet("--join",roomID).send(ws);
+    connect("join");
 });
 
 addPacketType("--join",(ws,message) => {
-    console.log("We joined the game!");
+    id = message;
+    console.log(`We joined the game! We are Player ID ${id} in Room ID ${roomID}`);
     p.textContent = "We joined the game!";
     document.querySelector("input").value = roomID;
 });
 
 addPacketType("--refusal",(ws,message) => {
     console.error(`Connection refused: ${message}`);
+    console.log(message);
     p.textContent = message;
     ws.close();
 });
@@ -170,6 +180,14 @@ addPacketType("--player-connection-update",(ws,message) => {
             console.log(`Waiting for ${player.name} to reconnect...`);
         }
     }
+});
+
+addPacketType("--ping",(ws,message) => {
+    
+});
+
+addPacketType("--pong",(ws,message) => {
+
 });
 
 //client example functionality

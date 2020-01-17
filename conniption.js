@@ -33,26 +33,26 @@ const RoomManager = {
 
     /**
      * Returns a specific Room instance.
-     * @param {Number|String} arg Either the name or the ID of the Room you want to find.
-     * @returns {Room|undefined} The Room instance associated with the name and ID, or undefined if the room couldn't be found.
+     * @param {Number} roomID The ID of the Room you want to find.
+     * @returns {Room|undefined} The Room instance associated with the ID, or undefined if the room couldn't be found.
      */
-    getRoom(arg) {
+    getRoom(roomID) {
         for (let i = 0; i < this.list.length; i++) {
-            if (this.list[i].id == arg || this.list[i].name === arg) {
+            if (this.list[i].id == roomID) {
                 return this.list[i];
             }
         }
-        console.warn(`No Room exists with name or ID "${arg}"!`);
+        console.warn(`No Room exists with ID "${roomID}"!`);
         return undefined;
     },
 
     /**
      * Removes a specific Room instance from the server.
-     * @param {Number|String} arg Either the name or the ID of the Room you want to find.
+     * @param {Number} roomID Either the ID of the Room you want to find.
      * @returns {Boolean} If the room was removed successfully or not.
      */
-    removeRoom(arg) {
-        let room = this.getRoom(arg);
+    removeRoom(roomID) {
+        let room = this.getRoom(roomID);
         if (room !== undefined) {
             room.remove();
             this.list.splice(this.list.indexOf(room),1);
@@ -62,11 +62,11 @@ const RoomManager = {
     },
 
     /**
-     * Removes all Room instances from the server.
+     * Sends a ping packet to every player of every room.
      */
-    removeAll() {
+    pingAll() {
         for (let i = 0; i < this.list.length; i++) {
-            this.removeRoom(this.list[i].id);
+            this.list[i].pingAll();
         }
     },
 
@@ -175,30 +175,34 @@ addPacketType("--fetch",(ws) => {
 //Make packet: Make a new room, send it back to the requester to connect.
 addPacketType("--make",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
-    let newID = RoomManager.addRoom(rp.message.name,rp.sender,rp.message.maxPlayers,rp.message.passcode);
+    let newID = RoomManager.addRoom(rp.message.name,rp.id,rp.message.maxPlayers,rp.message.passcode);
     new Packet("--make",newID).send(ws);
 });
 
 //Join packet: Try to add the requester to their specified Room.
 addPacketType("--join",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
-    let id = rp.room;
+    let roomID = rp.room;
     try {
-        let room = RoomManager.getRoom(id);
+        let room = RoomManager.getRoom(roomID);
         if (room === undefined) {
             throw `That room does not exist!`;
         }
-        room.addPlayer(rp.sender,ws,ws._socket.remoteAddress);
-        new Packet("--join").send(ws);
+        let player = room.addPlayer(rp.message,ws,ws._socket.remoteAddress);
+        new Packet("--join",player.common.id).send(ws);
     }
     catch (error) {
-        throw `Player could not join Room with ID "${id}": ${error}`;
+        throw `Player could not join Room with ID ${roomID}: ${error}`;
     }
 });
 
-addPacketType("--start",(ws,rp) => {
-    let id = rp.room;
-    id.inProgress = rp.message;
+addPacketType("--ping",(ws,rp) => {
+    //Return with a pong
+
+});
+
+addPacketType("--pong",(ws,rp) => {
+    //reset the sending clients pingaling
 });
 
 //Put default packet types here.
