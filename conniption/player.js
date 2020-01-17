@@ -13,9 +13,11 @@ module.exports = class Player {
         this.ws = ws;
         this.ip = ip;
         this.room = room;
-        this.reconnectionTimeout = undefined;
 
         this.common = new PlayerCommon(name);
+        this.reconnectionTimeout = undefined;
+        this.pingTimeout = undefined;
+        this.lastPing = 0;
 
         //more stuff here
         //HOW can I make it so you can add more properties to a player?
@@ -28,6 +30,10 @@ module.exports = class Player {
         if (this.reconnectionTimeout !== undefined) {
             clearTimeout(this.reconnectionTimeout);
             this.reconnectionTimeout = undefined;
+        }
+        if (this.pingTimeout != undefined) {
+            clearTimeout(this.pingTimeout);
+            this.pingTimeout = undefined;
         }
         this.ws.close();
     }
@@ -82,5 +88,20 @@ module.exports = class Player {
             id: this.common.id,
             status: true
         }),this.ws);
+    }
+
+    pinged() {
+        if (this.pingTimeout === undefined) {
+            this.pingTimeout = setTimeout((obj) => {
+                obj.room.removePlayer(obj);
+            },Config.get().PingTimeout,this);
+            this.lastPing = Date.now();
+        }
+    }
+
+    ponged() {
+        clearTimeout(this.pingTimeout);
+        this.pingTimeout = undefined;
+        this.common.ping = Date.now()-this.lastPing;
     }
 }

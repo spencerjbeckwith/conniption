@@ -63,10 +63,11 @@ const RoomManager = {
 
     /**
      * Sends a ping packet to every player of every room.
+     * Must be used with "RoomManager" because this is called on an interval when the server opens.
      */
     pingAll() {
-        for (let i = 0; i < this.list.length; i++) {
-            this.list[i].pingAll();
+        for (let i = 0; i < RoomManager.list.length; i++) {
+            RoomManager.list[i].pingAll();
         }
     },
 
@@ -113,6 +114,9 @@ function launchServer() {
 
     wss.on("listening",() => {
         console.log("Server opened successfully.");
+        if (Config.get().PingInterval > 0) {
+            setInterval(RoomManager.pingAll,Config.get().PingInterval);
+        }
     });
 
     wss.on("error",(error) => {
@@ -159,7 +163,9 @@ function launchServer() {
             //Disconnect/remove client
             if (ws.myRoom !== undefined) {
                 let obj = ws.myRoom.getPlayer(ws);
-                obj.room.lostPlayer(obj);
+                if (obj !== undefined) {
+                    obj.room.lostPlayer(obj);
+                }
             }
         });
     });
@@ -169,6 +175,7 @@ function launchServer() {
 addPacketType("--fetch",(ws) => {
     clearTimeout(ws.roomRequestTimeout);
     new Packet("--fetch",RoomManager.getSendable()).send(ws);
+    new Packet("--refusal",`Fetching complete.`).send(ws);
     ws.close();
 });
 
@@ -177,6 +184,8 @@ addPacketType("--make",(ws,rp) => {
     clearTimeout(ws.roomRequestTimeout);
     let newID = RoomManager.addRoom(rp.message.name,rp.id,rp.message.maxPlayers,rp.message.passcode);
     new Packet("--make",newID).send(ws);
+    new Packet("--refusal",`Making complete.`).send(ws);
+    ws.close();
 });
 
 //Join packet: Try to add the requester to their specified Room.
@@ -197,12 +206,11 @@ addPacketType("--join",(ws,rp) => {
 });
 
 addPacketType("--ping",(ws,rp) => {
-    //Return with a pong
-
+    new Packet("--pong").send(ws);
 });
 
 addPacketType("--pong",(ws,rp) => {
-    //reset the sending clients pingaling
+    RoomManager.getRoom(rp.room).getPlayer(rp.id).ponged();
 });
 
 //Put default packet types here.

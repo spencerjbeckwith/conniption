@@ -21,7 +21,9 @@ connect("join") will join the room with the same ID as our roomID variable.
 To do:
 -add constant pings back and forth. client to server, and server to client.
 	-make these pings reset upon receiving any packet. no dead connections during our conniption fit!
+	-upon server being "ponged" the room should send out new Pings of over player
 -blacklist and whitelist stuff
+-client-side configuration.
 -organize and document the client example.
 -make it so the rooms need the passcode before you can join
 -add gamecommon
@@ -48,3 +50,7 @@ thoughts for the future:
 	-remember that future functionality is based entirely on this package... so don't fully deprecate anything
 		-also means all names need to stay relevant and accurate to what they describe.
 	-how can more language support be added? Maybe... similarly to a config file?
+	-make hub connections go over a different port?
+		-this would be for a totally different version i think
+	-how can I make it so that there will NEVER be identical IDs? I can lower the chance...
+	-how can I implement UDP packets in this for a faster game experience?

@@ -216,10 +216,18 @@ module.exports = class Room {
      * Sends a ping packet to all players in this room.
      */
     pingAll() {
-        let packet = new Packet("--ping");
+        let pingArray = [];
+        for (let p = 0; p < this.players.length; p++) {
+            pingArray.push({
+                id: this.players[p].common.id,
+                ping: Date.now()-this.players[p].lastPing
+            });
+        }
+        let packet = new Packet("--ping",pingArray);
         this.sendAll(packet);
-
-        //Set the timeouts here
+        for (let p = 0; p < this.players.length; p++) {
+            this.players[p].pinged();
+        }
     }
 
     broadcast() {

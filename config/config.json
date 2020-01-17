@@ -17,5 +17,7 @@
         "MustHaveUniqueIP": false,
         "AllowReconnection": true,
         "ReconnectionTimeout": 10
-    }
+    },
+    "PingInterval": 500,
+    "PingTimeout": 6000
 }
