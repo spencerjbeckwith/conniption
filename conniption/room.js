@@ -35,10 +35,15 @@ module.exports = class Room {
     /**
      * Invoked when a new player attempts to connect to this Room.
      * @param {String} name The name of the user who is trying to connect.
+     * @param {String} passcode The Passcode needed to connect to the room.
      * @param {WebSocket} ws The WebSocket of the person connecting.
      * @param {String} ip The IP the connection is coming from.
      */
-    addPlayer(name,ws,ip) {
+    addPlayer(name,passcode = "",ws,ip) {
+        if (passcode != this.passcode) {
+            throw `Incorrect passcode!`;
+        }
+
         if (!Utility.nameIsValid(name)) {
             throw `Name "${name}" invalid! Must be ${Config.get().Users.Name.MinLength} to ${Config.get().Users.Name.MaxLength} characters long and must not contain any special characters.`;
         }

@@ -1,7 +1,7 @@
 const fs = require("fs");
-var ConfigObject = {};
-var WhiteList = "";
-var BlackList = "";
+let ConfigObject = {};
+let WhiteList = "";
+let BlackList = "";
 
 /**
  * Loads configuration from a file.

@@ -77,6 +77,25 @@ const Game = {
     }
 }
 
+class ConnectedEvent extends CustomEvent {
+    constructor() {
+        super("connected");
+        this.detail = {
+            //object here?
+        }
+    }
+}
+class DisconnectedEvent extends CustomEvent {
+    //i'm not entirely sure how to go about ading these kinds of events in here.
+    //do they need to be CustomEvent, or can they just extend Event?
+    //How exactly do I dispatch them? Creating new instances of THIS event class, right?
+    //  E.g. new DisconnectedEvent().dispatchEvent ... or something similar to that, maybe?
+    //How are they received? Where do I add the event listener?
+    //  E.g. something.addEventListener("disconnected",() => {...}) But what is that <something>?
+    //
+    // eh. I'll figure it out.
+}
+
 let PacketCallbacks = {};
 /**
  * Adds a new handling function when the server receives a packet of a certain type.
@@ -88,52 +107,21 @@ function addPacketType(name,callbackFn) {
     PacketCallbacks[name].push(callbackFn);
 }
 
-let name = undefined;
-let roomRequestName = undefined;
-let roomRequestMaxPlayers = undefined;
-let roomRequestPasscode = undefined;
-let roomID = undefined;
-let id = undefined;
-let ws = undefined;
-function initialize() {
-    name = "Example";
-    roomRequestName = "Example Room";
-    roomRequestMaxPlayers = 4;
-    roomRequestPasscode = "";
-
-    roomID = undefined;
-    id = undefined;
-    ws = undefined;
-    console.log("Initialized.");
-}
-initialize();
-
-const p = document.querySelector("p");
-
-function connect(roomRequest) {
+function connect(request,object = {}) {
     if (ws === undefined) {
         ws = new WebSocket("ws://localhost:44956");
         ws.addEventListener("open",() => {
-            switch (roomRequest) {
+            switch (request) {
                 case ("fetch"): {
-                    console.log("Fetching game rooms...");
                     new Packet("--fetch").send();
                     break;
                 }
                 case ("make"): {
-                    console.log("Requesting to make a new room...")
-                    let packet = new Packet("--make",{
-                        name: roomRequestName,
-                        maxPlayers: roomRequestMaxPlayers,
-                        passcode: roomRequestPasscode
-                        //other game configurable game properties would go here
-                    });
-                    packet.send();
+                    new Packet("--make",object).send();
                     break;
                 }
                 case ("join"): {
-                    console.log("Requesting to join a room...");
-                    new Packet("--join",name).send();
+                    new Packet("--join",object).send();
                     break;
                 }
                 default: {
@@ -200,8 +188,12 @@ addPacketType("--fetch",(message) => {
 addPacketType("--make",(message) => {
     console.log("Our room is room ID "+message+"! Connecting...");
     roomID = message;
+    inputGameID.value = roomID;
     setTimeout(() => {
-        connect("join");
+        connect("join",{
+            name: myName,
+            passcode: roomPasscode
+        });
     },100);
 });
 
@@ -209,7 +201,6 @@ addPacketType("--join",(message) => {
     id = message;
     console.log(`We joined the game! We are Player ID ${id} in Room ID ${roomID}`);
     p.textContent = "We joined the game!";
-    document.querySelector("input").value = roomID;
 
     //begin our pinging
     Game.pingInterval = setInterval(() => {
@@ -256,18 +247,66 @@ addPacketType("--pong",(ws,message) => {
     Game.ponged();
 });
 
-//client example functionality
 
-document.querySelector("button.fetch").addEventListener("click",() => {
+//CLIENT FUNCTIONALITY BELOW
+
+const p = document.querySelector("p.status");
+
+const inputName = document.querySelector("input.name");
+const inputGameName = document.querySelector("input.game-name");
+const inputGamePasscode = document.querySelector("input.game-passcode");
+const inputGameID = document.querySelector("input.game-id");
+
+const buttonFetch = document.querySelector("button.fetch");
+const buttonMake = document.querySelector("button.make");
+const buttonJoin = document.querySelector("button.join");
+const buttonDisconnect = document.querySelector("button.disconnect");
+
+buttonFetch.addEventListener("click",() => {
     connect("fetch");
 });
-document.querySelector("button.make").addEventListener("click",() => {
-    connect("make");
+buttonMake.addEventListener("click",() => {
+    roomName = inputGameName.value;
+    roomPasscode = inputGamePasscode.value;
+    //set other things here?
+    connect("make",{
+        name: roomName,
+        creatorName: myName,
+        passcode: roomPasscode,
+        maxPlayers: roomMaxPlayers
+        //other game configurable game properties would go here
+    });
 });
-document.querySelector("button.join").addEventListener("click",() => {
-    roomID = document.querySelector("input").value;
-    connect("join");
+buttonJoin.addEventListener("click",() => {
+    myName = inputName.value;
+    roomPasscode = inputGamePasscode.value;
+    roomID = inputGameID.value;
+    connect("join",{
+        name: myName,
+        passcode: roomPasscode
+    }); //Don't forget: connect("join",...) is ALSO called on the receiving on a --make packet!!
 });
-document.querySelector("button.disconnect").addEventListener("click",() => {
+buttonDisconnect.addEventListener("click",() => {
     disconnect();
 });
+
+function initialize() {
+    myName = "Default";
+    roomName = "Game Room";
+    roomPasscode = "";
+    roomMaxPlayers = 4;
+
+    roomID = undefined;
+    id = undefined;
+    ws = undefined;
+
+    //Set proper content of our inputs and boxes.
+    inputName.value = myName;
+    inputGameName.value = roomName;
+    inputGamePasscode.value = "";
+    //buttonDisconnect.disabled = true;
+
+    console.log("Initialized.");
+}
+
+initialize();

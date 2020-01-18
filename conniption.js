@@ -20,7 +20,7 @@ const RoomManager = {
      * @param {[String]} passcode An optional passcode needed to connect to the room.
      * @returns {Number|undefined} The ID of the new room, or undefined if it fails.
      */
-    addRoom(name,creatorName,maxPlayers = Config.get().DefaultPlayersPerRoom,passcode = "") {
+    addRoom(name,creatorName,passcode = "",maxPlayers = Config.get().DefaultPlayersPerRoom) {
         if (name === "") {
             console.warn(`Room name must not be empty!`);
             return undefined;
@@ -188,7 +188,7 @@ addPacketType("--make",(ws,rp) => {
     if (!Config.checkAllowed(ws._socket.remoteAddress)) {
         throw `You are not allowed to connect to this server.`;
     }
-    let newID = RoomManager.addRoom(rp.message.name,rp.id,rp.message.maxPlayers,rp.message.passcode);
+    let newID = RoomManager.addRoom(rp.message.name,rp.message.creatorName,rp.message.passcode,rp.id,rp.message.maxPlayers);
     new Packet("--make",newID).send(ws);
     new Packet("--refusal",`Making complete.`).send(ws);
     ws.close();
@@ -206,7 +206,8 @@ addPacketType("--join",(ws,rp) => {
         if (room === undefined) {
             throw `That room does not exist!`;
         }
-        let player = room.addPlayer(rp.message,ws,ws._socket.remoteAddress);
+        
+        let player = room.addPlayer(rp.message.name,rp.message.passcode,ws,ws._socket.remoteAddress);
         new Packet("--join",player.common.id).send(ws);
     }
     catch (error) {
