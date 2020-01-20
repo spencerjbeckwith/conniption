@@ -1,7 +1,8 @@
+const EventEmitter = require("events");
 const Config = require("./config.js");
 const PlayerCommon = require("./playercommon.js");
 const Packet = require("./packet.js");
-module.exports = class Player {
+module.exports = class Player extends EventEmitter {
     /**
      * Creates a new instance of a Player.
      * @param {String} name The username of the Player.
@@ -10,6 +11,7 @@ module.exports = class Player {
      * @param {Number} room The room ID this player has joined.
      */
     constructor(name,ws,ip,room) {
+        super();
         this.ws = ws;
         this.ip = ip;
         this.room = room;
@@ -27,6 +29,7 @@ module.exports = class Player {
      * Invoked to remove this player from memory safely upon a permanent disconnection.
      */
     remove() {
+        this.emit("remove");
         if (this.reconnectionTimeout !== undefined) {
             clearTimeout(this.reconnectionTimeout);
             this.reconnectionTimeout = undefined;
@@ -53,6 +56,7 @@ module.exports = class Player {
      */
     kick() {
         new Packet("--refusal","You have been removed from the server.").send(this.ws);
+        this.emit("kick");
         this.room.removePlayer(this);
     }
 
@@ -61,6 +65,7 @@ module.exports = class Player {
      */
     ban() {
         Config.addToBlackList(`${this.ip} - "${this.common.name}"`);
+        this.emit("ban");
         this.kick();
     }
 
@@ -78,6 +83,8 @@ module.exports = class Player {
             id: this.common.id,
             status: false
         }),this.ws);
+
+        this.emit("lost");
     }
 
     /**
@@ -96,6 +103,8 @@ module.exports = class Player {
             id: this.common.id,
             status: true
         }),this.ws);
+
+        this.emit("found");
     }
 
     /**

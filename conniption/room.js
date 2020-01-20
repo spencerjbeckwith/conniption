@@ -1,22 +1,20 @@
+const EventEmitter = require("events");
 const Config = require("./config.js");
 const Utility = require("./utility.js");
 const Player = require("./player.js");
 const Packet = require("./packet.js");
-module.exports = class Room {
+const RoomCommon = require("./roomcommon.js");
+module.exports = class Room extends EventEmitter {
     constructor(name,creatorName,maxPlayers,passcode = "") {
-        this.id = Math.floor(Math.random()*1000000000);
-        this.name = name;
+        super();
+        this.common = new RoomCommon(name,creatorName);
         this.passcode = passcode;
         this.maxPlayers = Math.min(maxPlayers,Config.get().MaxPlayersPerRoom);
 
         this.players = [];
-        this.inProgress = false;
         this.manager = undefined;
-        this.host = creatorName;
 
-        //gamecommon can go here.
-
-        console.log(`New room "${this.name}" created with ID ${this.id}. Waiting for players...`);
+        console.log(`New room "${this.common.name}" created with ID ${this.common.id}. Waiting for players...`);
         this.myTimeout = undefined;
         this.setEmptyTimeout();
     }
@@ -25,11 +23,12 @@ module.exports = class Room {
      * Invoke to remove this room from memory safely.
      */
     remove() {
-        //Handle the room removal stuff here
+        this.emit("remove");
+        this.kickAll();
         if (this.myTimeout !== undefined) {
             clearTimeout(this.myTimeout);
         }
-        console.log(`Removed room "${this.name}" with ID ${this.id}.`);
+        console.log(`Removed room "${this.common.name}" with ID ${this.common.id}.`);
     }
 
     /**
@@ -40,6 +39,8 @@ module.exports = class Room {
      * @param {String} ip The IP the connection is coming from.
      */
     addPlayer(name,passcode = "",ws,ip) {
+        this.emit("beforeConnection",name,passcode,ws,ip);
+
         if (passcode != this.passcode) {
             throw `Incorrect passcode!`;
         }
@@ -60,7 +61,7 @@ module.exports = class Room {
             }
         }
 
-        if (!Config.get().AllowJoinInProgress && this.inProgress) {
+        if (!Config.get().AllowJoinInProgress && this.common.inProgress) {
             throw `Cannot join a Room in progress!`;
         }
         if (this.players.length >= this.maxPlayers) {
@@ -89,12 +90,12 @@ module.exports = class Room {
         this.players.push(player);
         ws.myRoom = this;
         ws.myPlayer = player;
-        console.log(`Player "${player.common.name}" with ID ${player.common.id} and IP ${player.ip} has joined Room "${this.name}" with ID ${this.id}.`);
+        console.log(`Player "${player.common.name}" with ID ${player.common.id} and IP ${player.ip} has joined Room "${this.common.name}" with ID ${this.common.id}.`);
         if (this.host === name) { //Our host connected!
             this.setHost(player);
         }
         this.sendSelf(`${name} has connected!`);
-
+        this.emit("afterConnection",player);
         return player;
     }
 
@@ -126,6 +127,7 @@ module.exports = class Room {
     removePlayer(player) {
         let index = this.players.indexOf(player);
         if (index !== -1) {
+            this.emit("beforeRemovePlayer",player);
             player.remove();
             this.players.splice(index,1);
             this.sendSelf(`${player.common.name} has disconnected.`);
@@ -134,8 +136,9 @@ module.exports = class Room {
             if (this.players.length === 0) {
                 this.setEmptyTimeout();
             }
+            this.emit("afterRemovePlayer",player);
         } else {
-            console.warn(`Tried to remove a player that doesn't exist in the Room ID ${this.id}!`);
+            console.warn(`Tried to remove a player that doesn't exist in the Room ID ${this.common.id}!`);
         }
     }
 
@@ -145,15 +148,25 @@ module.exports = class Room {
      */
     lostPlayer(player) {
         if (player !== undefined) {
-            if (this.inProgress && Config.get().Users.AllowReconnection) {
+            if (this.common.inProgress && Config.get().Users.AllowReconnection) {
                 let timeoutSeconds = Config.get().Users.ReconnectionTimeout;
                 console.log(`${player.common.name} has lost connection. They have ${timeoutSeconds} seconds to reconnect.`);
                 player.lost();
+                this.emit("lostPlayer",player);
             } else {
                 this.removePlayer(player);
             }
         } else {
-            console.warn(`Tried to lose a player that doesn't exist in the Room ID ${this.id}!`);
+            console.warn(`Tried to lose a player that doesn't exist in the Room ID ${this.common.id}!`);
+        }
+    }
+
+    /**
+     * Disconnects all players in this room.
+     */
+    kickAll() {
+        for (let p = 0; p < this.players.length; p++) {
+            this.players[p].kick();
         }
     }
 
@@ -162,14 +175,16 @@ module.exports = class Room {
      * @param {Player} player The Player instance to make the host.
      */
     setHost(player) {
-        //Unset our old host, if we had one.
-        for (let p = 0; p < this.players.length; p++) {
-            this.players[p].common.isHost = false;
-        }
-        if (player !== undefined) {
-            this.host = player;
-            player.common.isHost = true;
-            console.log(`Host of Room ID ${this.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
+        if (this.getHost() !== player) {
+            //Unset our old host, if we had one.
+            for (let p = 0; p < this.players.length; p++) {
+                this.players[p].common.isHost = false;
+            }
+            if (player !== undefined) {
+                this.common.host = player;
+                player.common.isHost = true;
+                console.log(`Host of Room ID ${this.common.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
+            }
         }
     }
 
@@ -178,7 +193,7 @@ module.exports = class Room {
      * @returns {Player|String} The Player who is currently the host, or the String name of the Player who created the room if they haven't connected.
      */
     getHost() {
-        return this.host;
+        return this.common.host;
     }
 
     /**
@@ -195,9 +210,9 @@ module.exports = class Room {
         }
         
         let packet = new Packet("--players",{
-            //add our gamecommon here.
             message: message,
-            array: array
+            array: array,
+            common: this.common
         });
         this.sendAll(packet);
     }
@@ -233,10 +248,6 @@ module.exports = class Room {
         }
     }
 
-    broadcast() {
-
-    }
-
     /**
      * Invoked to set a timeout to remove an empty room.
      */
@@ -246,8 +257,8 @@ module.exports = class Room {
         }
         this.myTimeout = setTimeout((obj) => {
             if (obj.players.length === 0) {
-                console.log(`No players are present in Room ID ${obj.id}. Removing...`);
-                obj.manager.removeRoom(obj.id);
+                console.log(`No players are present in Room ID ${obj.common.id}. Removing...`);
+                obj.manager.removeRoom(obj.common.id);
             }
         },Config.get().RoomEmptyTimeout,this);
     }

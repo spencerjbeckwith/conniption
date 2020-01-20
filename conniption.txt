@@ -19,8 +19,6 @@ connect("join") will join the room with the same ID as our roomID variable.
 
 
 To do:
--client-side configuration.
--make it so the rooms need the passcode before you can join
 -add gamecommon
 	-if you move variables in here, MAKE SURE to update the rest of the files.
 -functions for changing progress state of a room? put in gamecommon
@@ -36,6 +34,27 @@ To do:
 -how to make a player? and how to make the player easily extensible? ooh.
 	-how to extend it at all? It has something to do with modifying prototypes, yes?
 -how to make an easy client-side framework that can be used in pure JS?
+-what exactly will a game based on this, ACTUALLY look like?
+
+ROOM EVENTS:
+-"remove"
+-"beforeConnection" - name, passcode, ws, ip
+-"afterConnection" - player
+-"beforeRemovePlayer" - player
+-"afterRemovePlayer" - player
+-"lostPlayer" - player
+
+PLAYER EVENTS:
+-"remove"
+-"kick"
+-"ban"
+-"lost"
+-"found"
+
+-PLAYERCOMMON EVENTS:
+
+-GAMECOMMON EVENTS:
+
 
 thoughts for the future:
 	-how can a player timing out send more updates about how long they have left to reconnect?

@@ -28,7 +28,7 @@ const RoomManager = {
         let room = new Room(name,creatorName,maxPlayers,passcode);
         this.list.push(room);
         room.manager = this;
-        return room.id;
+        return room.common.id;
     },
 
     /**
@@ -38,7 +38,7 @@ const RoomManager = {
      */
     getRoom(roomID) {
         for (let i = 0; i < this.list.length; i++) {
-            if (this.list[i].id == roomID) {
+            if (this.list[i].common.id == roomID) {
                 return this.list[i];
             }
         }
@@ -79,15 +79,24 @@ const RoomManager = {
         let returnObject = [];
         for (let i = 0; i < this.list.length; i++) {
             returnObject[i] = {
-                id: this.list[i].id,
-                name: this.list[i].name,
+                id: this.list[i].common.id,
+                name: this.list[i].common.name,
                 passcode: (this.list[i].passcode !== ""),
                 maxPlayers: this.list[i].maxPlayers,
                 players: this.list[i].players.length,
-                inProgress: this.list[i].inProgress
+                inProgress: this.list[i].common.inProgress
             }
         }
         return returnObject;
+    },
+
+    /**
+     * Removes all rooms and all players connected to them. Safely ends and disconnects everything.
+     */
+    removeAll() {
+        for (let i = 0; i < this.list.length; i++) {
+            this.removeRoom(this.list[i].common.id);
+        }
     }
 }
 
@@ -154,6 +163,7 @@ function launchServer() {
             }
             catch (error) {
                 console.error(`Error receiving data: ${error}`);
+                console.error(error);
                 new Packet("--refusal",error).send(ws);
                 ws.close();
             }

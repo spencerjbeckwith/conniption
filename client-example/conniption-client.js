@@ -33,6 +33,11 @@ class PlayerCommon {
     }
 }
 
+const Config = {
+    ServerTimeout: 5000,
+    PingInterval: 500
+}
+
 const Game = {
     common: {},
     players: [],
@@ -41,15 +46,22 @@ const Game = {
     lastPing: 0,
     ping: 0,
 
-    getPlayer(id) {
+    /**
+     * Returns a PlayerCommon instance with a specified ID.
+     * @param {Number} checkID The server-generator ID of the player to check.
+     */
+    getPlayer(checkID = id) {
         for (let i = 0; i < this.players.length; i++) {
-            if (this.players[i].id === id) {
+            if (this.players[i].id === checkID) {
                 return this.players[i];
             }
         }
         return undefined;
     },
 
+    /**
+     * Invoked when a ping is sent to the server, while connected.
+     */
     pinged() {
         if (ws !== undefined) {
             if (this.pingTimeout === undefined) {
@@ -58,42 +70,33 @@ const Game = {
                 this.pingTimeout = setTimeout(() => {
                     console.error(`Lost connection to the server.`);
                     disconnect();
-                },5000); //CONFIGURE ME LATER
+                },Config.ServerTimeout);
             }
         }
     },
 
+    /**
+     * Invoked when a pong is received back from the server.
+     */
     ponged() {
         clearTimeout(this.pingTimeout);
         this.pingTimeout = undefined;
         this.ping = Date.now()-this.lastPing;
     },
 
+    /**
+     * Resets the Game back to its default state.
+     */
     reset() {
         clearInterval(this.pingInterval);
         if (this.pingTimeout !== undefined) {
             clearTimeout(this.pingTimeout);
         }
-    }
-}
 
-class ConnectedEvent extends CustomEvent {
-    constructor() {
-        super("connected");
-        this.detail = {
-            //object here?
-        }
+        //Remove all objects.
+        this.common = {};
+        this.players = [];
     }
-}
-class DisconnectedEvent extends CustomEvent {
-    //i'm not entirely sure how to go about ading these kinds of events in here.
-    //do they need to be CustomEvent, or can they just extend Event?
-    //How exactly do I dispatch them? Creating new instances of THIS event class, right?
-    //  E.g. new DisconnectedEvent().dispatchEvent ... or something similar to that, maybe?
-    //How are they received? Where do I add the event listener?
-    //  E.g. something.addEventListener("disconnected",() => {...}) But what is that <something>?
-    //
-    // eh. I'll figure it out.
 }
 
 let PacketCallbacks = {};
@@ -205,7 +208,7 @@ addPacketType("--join",(message) => {
     //begin our pinging
     Game.pingInterval = setInterval(() => {
         Game.pinged();
-    },500); //CONFIGURE ME LATER!
+    },Config.PingInterval);
 });
 
 addPacketType("--refusal",(message) => {
@@ -219,8 +222,9 @@ addPacketType("--players",(message) => {
     if (message.message !== "") {
         console.log(message.message);
     }
-    //load a gamecommon here
+    //Load our game's players and roomcommon
     Game.players = message.array;
+    Game.common = message.common;
 });
 
 addPacketType("--player-connection-update",(message) => {
