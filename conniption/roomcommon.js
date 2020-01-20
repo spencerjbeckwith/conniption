@@ -6,6 +6,7 @@ module.exports = class RoomCommon extends EventEmitter {
         this.name = name;
 
         this.inProgress = false;
+        this.paused = false;
         this.host = creatorName;
     }
 }

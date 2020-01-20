@@ -16,6 +16,7 @@ module.exports = class Room extends EventEmitter {
 
         console.log(`New room "${this.common.name}" created with ID ${this.common.id}. Waiting for players...`);
         this.myTimeout = undefined;
+        this.logicInterval = undefined;
         this.setEmptyTimeout();
     }
 
@@ -25,6 +26,9 @@ module.exports = class Room extends EventEmitter {
     remove() {
         this.emit("remove");
         this.kickAll();
+        if (this.common.inProgres) {
+            this.endGame();
+        }
         if (this.myTimeout !== undefined) {
             clearTimeout(this.myTimeout);
         }
@@ -173,7 +177,7 @@ module.exports = class Room extends EventEmitter {
     /**
      * Sets a new host for this Room.
      * @param {Player} player The Player instance to make the host.
-     */
+    */
     setHost(player) {
         if (this.getHost() !== player) {
             //Unset our old host, if we had one.
@@ -197,7 +201,7 @@ module.exports = class Room extends EventEmitter {
     }
 
     /**
-     * Sends an array of all PlayerCommons in the room, for use by the players connected.
+     * Sends an object containing an array of all PlayerCommons in the room and all common game data, for use by the players connected.
      * @param {[String]} message An optional message to send alongside the array, to all players.
      */
     sendSelf(message = "") {
@@ -261,5 +265,69 @@ module.exports = class Room extends EventEmitter {
                 obj.manager.removeRoom(obj.common.id);
             }
         },Config.get().RoomEmptyTimeout,this);
+    }
+
+    /**
+     * When called, begins the game and launches the game logic interval.
+     */
+    startGame() {
+        if (!this.common.inProgress) {
+            this.common.inProgress = true
+            this.common.paused = false;
+            if (this.logicInterval === undefined && Config.get().LogicInterval > 0) {
+                this.logicInterval = setInterval(() => {
+                    this.gameLogic();
+                },Config.get().LogicInterval);
+            }
+            this.sendAll(new Packet("--gamestate","start"));
+            this.emit("start");
+        } else {
+            console.warn(`Cannot start a Game that is already in progress! ID: ${this.common.id}`);
+        }
+    }
+
+    /**
+     * Pauses or unpauses the game. This prevents the logic interval from firing, but maintains the session.
+     */
+    pauseGame() {
+        if (!this.common.paused) {
+            //Pause
+            this.common.paused = true;
+            this.sendAll(new Packet("--gamestate","paused"));
+            this.emit("paused");
+        } else {
+            //Unpause
+            this.common.paused = false;
+            this.sendAll(new Packet("--gamestate","unpaused"));
+            this.emit("unpaused");
+        }
+    }
+
+    /**
+     * Ends a game and stops the game logic interval.
+     */
+    endGame() {
+        if (this.common.inProgress) {
+            this.common.inProgress = false;
+            this.common.paused = false;
+            if (this.logicInterval !== undefined) {
+                clearInterval(this.logicInterval);
+                this.logicInterval = undefined;
+            }
+            this.sendAll(new Packet("--gamestate","end"));
+            this.emit("end");
+        } else {
+            console.warn(`Cannot end a Game that is not in progress! ID: ${this.common.id}`);
+        }
+    }
+
+    /**
+     * Invoked over a specified interval to do game logic.
+     */
+    gameLogic() {
+        if (!this.common.paused) {
+            this.emit("logic");
+            this.sendSelf();
+        }
     }
 }

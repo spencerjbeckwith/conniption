@@ -1,258 +1,340 @@
-class Packet {
-    constructor(type,message = "") {
-        this.type = type;
-        this.message = message;
+class Conniption extends EventTarget {
+    constructor() {
+        super();
+        this.myName = "Default";
+        this.roomName = "Game Room";
+        this.roomPasscode = "";
+        this.roomMaxPlayers = 4;
+
+        this.id = undefined;
+        this.roomID = undefined;
+        this.ws = undefined;
+        this.PacketCallbacks = {};
+
+        this.Config = {
+            ip: "ws://localhost:44956",
+            ServerTimeout: 5000,
+            PingInterval: 500
+        }
+
+        this.Game = {
+            common: {},
+            players: [],
+            pingInterval: undefined,
+            pingTimeout: undefined,
+            lastPing: 0,
+            ping: 0,
         
-        //To identify this client.
-        this.id = id;
-        this.room = roomID;
-    }
-
-    send() {
-        if (ws !== undefined) {
-            if (ws.readyState === 1) {
-                ws.send(JSON.stringify(this));
+            /**
+             * Returns a client-side PlayerCommon instance with a specified ID.
+             * @param {Number} checkID The server-generator ID of the player to check.
+             */
+            getPlayer(checkID = id) {
+                for (let i = 0; i < this.players.length; i++) {
+                    if (this.players[i].id === checkID) {
+                        return this.players[i];
+                    }
+                }
+                return undefined;
+            },
+        
+            /**
+             * Invoked when a ping is sent to the server, while connected.
+             */
+            pinged() {
+                if (this.ws !== undefined) {
+                    if (this.pingTimeout === undefined) {
+                        this.lastPing = Date.now();
+                        new this.Packet(this,"--ping").send();
+                        this.pingTimeout = setTimeout((obj) => {
+                            console.error(`Lost connection to the server.`);
+                            obj.disconnect();
+                        },Config.ServerTimeout,obj);
+                    }
+                }
+            },
+        
+            /**
+             * Invoked when a pong is received back from the server.
+             */
+            ponged() {
+                clearTimeout(this.pingTimeout);
+                this.pingTimeout = undefined;
+                this.ping = Date.now()-this.lastPing;
+            },
+        
+            /**
+             * Resets the Game back to its default state.
+             */
+            reset() {
+                clearInterval(this.pingInterval);
+                if (this.pingTimeout !== undefined) {
+                    clearTimeout(this.pingTimeout);
+                }
+        
+                //Remove all objects.
+                this.common = {};
+                this.players = [];
             }
         }
-    }
-}
 
-class PlayerCommon {
-    constructor(obj) {
-        this.id = obj.id;
-        this.name = obj.name;
-        this.isHost = obj.isHost;
-        this.connected = true;
-        this.ping = obj.ping;
-
-        //Client-side. This is not present in server-side playercommon
-        this.me = false;
-        if (this.id === id) {
-            this.me = true;
+        /**
+         * Creates a new Packet to be sent to the server.
+         * @param {Conniption} cn The Conniption instance that this packet should use for its ID, roomID, and WebSocket.
+         * @param {String} type The type of the packet to send.
+         * @param {String} message The content to send in the packet. Can be any type, or even an object, as long as it is received properly by the server.
+         */
+        this.Packet = function(cn,type,message = "") {
+            this.type = type;
+            this.message = message;
+            
+            //To identify this client.
+            this.id = cn.id;
+            this.room = cn.roomID;
+            this.ws = cn.ws;
         }
-    }
-}
-
-const Config = {
-    ServerTimeout: 5000,
-    PingInterval: 500
-}
-
-const Game = {
-    common: {},
-    players: [],
-    pingInterval: undefined,
-    pingTimeout: undefined,
-    lastPing: 0,
-    ping: 0,
-
-    /**
-     * Returns a PlayerCommon instance with a specified ID.
-     * @param {Number} checkID The server-generator ID of the player to check.
-     */
-    getPlayer(checkID = id) {
-        for (let i = 0; i < this.players.length; i++) {
-            if (this.players[i].id === checkID) {
-                return this.players[i];
+        this.Packet.prototype = {
+            constructor: this.Packet,
+            send: function() {
+                if (this.ws !== undefined) {
+                    if (this.ws.readyState === 1) {
+                        this.ws.send(JSON.stringify(this));
+                    }
+                }
             }
         }
-        return undefined;
-    },
 
-    /**
-     * Invoked when a ping is sent to the server, while connected.
-     */
-    pinged() {
-        if (ws !== undefined) {
-            if (this.pingTimeout === undefined) {
-                this.lastPing = Date.now();
-                new Packet("--ping").send();
-                this.pingTimeout = setTimeout(() => {
-                    console.error(`Lost connection to the server.`);
-                    disconnect();
-                },Config.ServerTimeout);
-            }
-        }
-    },
+        
 
-    /**
-     * Invoked when a pong is received back from the server.
-     */
-    ponged() {
-        clearTimeout(this.pingTimeout);
-        this.pingTimeout = undefined;
-        this.ping = Date.now()-this.lastPing;
-    },
-
-    /**
-     * Resets the Game back to its default state.
-     */
-    reset() {
-        clearInterval(this.pingInterval);
-        if (this.pingTimeout !== undefined) {
-            clearTimeout(this.pingTimeout);
-        }
-
-        //Remove all objects.
-        this.common = {};
-        this.players = [];
+        this.addDefaultPackets();
     }
-}
+    
+    /**
+     * Adds a new handling function when the server receives a packet of a certain type.
+     * @param {String} name The label of received packets that should react this way.
+     * @param {Function} callbackFn A callback function to invoke when this type of packet is received.
+     */
+    addPacketType(name,callbackFn) {
+        this.PacketCallbacks[name] = this.PacketCallbacks[name] || [];
+        this.PacketCallbacks[name].push(callbackFn);
+    }
 
-let PacketCallbacks = {};
-/**
- * Adds a new handling function when the server receives a packet of a certain type.
- * @param {String} name The label of received packets that should react this way.
- * @param {Function} callbackFn A callback function to invoke when this type of packet is received.
- */
-function addPacketType(name,callbackFn) {
-    PacketCallbacks[name] = PacketCallbacks[name] || [];
-    PacketCallbacks[name].push(callbackFn);
-}
+    /**
+     * Attempts to connect to the server to fetch active games, make a new one, or join an existing one.
+     * @param {String} request Either "fetch", "make", or "join": The action to connect to the server and attempt to execute.
+     */
+    connect(request) {
+        if (this.ws === undefined) {
+            this.ws = new WebSocket(this.Config.ip);
+            this.ws.addEventListener("open",() => {
+                //EVENT
+                switch (request) {
+                    case ("fetch"): {
+                        new this.Packet(this,"--fetch").send();
+                        break;
+                    }
+                    case ("make"): {
+                        new this.Packet(this,"--make",{
+                            name: this.roomName,
+                            creatorName: this.myName,
+                            passcode: this.roomPasscode,
+                            maxPlayers: this.roomMaxPlayers
+                        }).send();
+                        break;
+                    }
+                    case ("join"): {
+                        new this.Packet(this,"--join",{
+                            name: this.myName,
+                            passcode: this.roomPasscode
+                        }).send();
+                        break;
+                    }
+                    default: {
+                        console.error("No request specified! Be sure to use 'fetch' 'make' or 'join' as arguments to connect(...).");
+                        this.disconnect();
+                        break;
+                    }
+                }
+            });
+    
+            this.ws.addEventListener("close",() => {
+                //p.textContent = "Connection closed.";
+                //EVENT
+                this.disconnect();
+            });
+    
+            this.ws.addEventListener("error",(error) => {
+                //p.textContent = "An error has occured. "+error;
+                //EVENT
+            });
+    
+            this.ws.addEventListener("message",(message) => {
+                let rp = {};
+                try {
+                    rp = JSON.parse(message.data);
+                }
+                catch (error) {
+                    rp.type = "__INVALID__";
+                }
+                try {
+                    if (rp.type === "__INVALID__") {
+                        throw `Packet could not be parsed`;
+                    }
+    
+                    if (this.PacketCallbacks[rp.type]) {
+                        this.PacketCallbacks[rp.type].forEach((packetFunction) => {
+                            packetFunction(rp.message);
+                        });
+                    } else {
+                        throw `Received unidentifiable packet type: ${rp.type}`
+                    }
+                }
+                catch (error) {
+                    console.error(`Error receiving data: ${error}`);
+                    this.disconnect();
+                }
+            });
+        } else {
+            console.warn(`Cannot connect when we are already connected!`);
+        }
+    }
 
-function connect(request,object = {}) {
-    if (ws === undefined) {
-        ws = new WebSocket("ws://localhost:44956");
-        ws.addEventListener("open",() => {
-            switch (request) {
-                case ("fetch"): {
-                    new Packet("--fetch").send();
+    /**
+     * Disconnections this Conniption instance from anything it may be connected to.
+     */
+    disconnect() {
+        if (this.ws !== undefined) {
+            this.ws.close();
+            this.ws = undefined;
+        }
+        this.Game.reset();
+    }
+
+    /**
+     * Adds all code for the default Conniption client packets.
+     */
+    addDefaultPackets() {
+        //FETCH packet: Server sent us a list of all game rooms.
+        this.addPacketType("--fetch",(message) => {
+            let roomList = message;
+            console.log(roomList);
+            //do something with the array, HERE
+        });
+        
+        //MAKE packet: Server approved our request to make a new game room.
+        this.addPacketType("--make",(message) => {
+            console.log("Our room is room ID "+message+"! Connecting...");
+            this.roomID = message;
+            //inputGameID.value = roomID;
+            setTimeout((obj) => {
+                obj.connect("join");
+            },100,this);
+        });
+        
+        //JOIN packet: Server approved our attempt to join a game room.
+        this.addPacketType("--join",(message) => {
+            this.id = message;
+            console.log(`We joined the game! We are Player ID ${this.id} in Room ID ${this.roomID}`);
+            //p.textContent = "We joined the game!";
+            //EVENT
+        
+            //begin our pinging
+            this.Game.pingInterval = setInterval(function(obj) {
+                obj.Game.pinged();
+            },this.Config.PingInterval,this);
+        });
+        
+        //REFUSAL packet: We've been disconnected for some reason.
+        this.addPacketType("--refusal",(message) => {
+            console.error(`Connection refused: ${message}`);
+            console.log(message);
+            //p.textContent = message;
+            //EVENT
+            this.disconnect();
+        });
+        
+        //PLAYERS packet: We've gotten an update on the game, game logic, and player connections.
+        this.addPacketType("--players",(message) => {
+            if (message.message !== "") {
+                console.log(message.message);
+            }
+            //Load our game's players and roomcommon
+            this.Game.players = message.array;
+            this.Game.common = message.common;
+            //EVENT
+        });
+        
+        //PLAYER-CONNECTION-UPDATE packet: A player was lost or found on the server.
+        this.addPacketType("--player-connection-update",(message) => {
+            let player = this.Game.getPlayer(message.id);
+            if (player !== undefined) {
+                player.connected = message.status;
+                if (message.status) {
+                    console.log(`${player.name} has reconnected!`);
+                    //EVENT
+                } else {
+                    console.log(`Waiting for ${player.name} to reconnect...`);
+                    //EVENT
+                }
+            }
+        });
+        
+        //PING packet: The server is making sure we're still here.
+        this.addPacketType("--ping",(message) => {
+            let pingArray = message;
+            for (let p = 0; p < pingArray.length; p++) {
+                this.Game.getPlayer(pingArray[p].id).ping = pingArray[p].ping;
+            }
+            new this.Packet(this,"--pong").send();
+            //EVENT
+        });
+        
+        //PONG packet: The server let us know that they are still there.
+        this.addPacketType("--pong",(message) => {
+            this.Game.ponged();
+            //EVENT
+        });
+        
+        //GAMESTATE packet: The game has begun, been paused/unpaused, or ended.
+        this.addPacketType("--gamestate",(message) => {
+            switch (message) {
+                case ("start"): {
+                    console.log("The game has begun!");
+                    this.Game.common.inProgress = true;
+                    this.Game.common.paused = false;
+                    //EVENT
                     break;
                 }
-                case ("make"): {
-                    new Packet("--make",object).send();
+                case ("paused"): {
+                    console.log("The game has been paused.");
+                    this.Game.common.paused = true;
+                    //EVENT
                     break;
                 }
-                case ("join"): {
-                    new Packet("--join",object).send();
+                case ("unpaused"): {
+                    console.log("The game has been unpaused.");
+                    this.Game.common.paused = false;
+                    //EVENT
+                    break;
+                }
+                case ("end"): {
+                    console.log("The game has ended.");
+                    this.Game.common.inProgress = false;
+                    this.Game.common.paused = false;
+                    //EVENT
                     break;
                 }
                 default: {
-                    console.error("No request specified! Be sure to use 'fetch' 'make' or 'join' as arguments to connect(...).");
-                    break;
+                    throw `Received invalid gamestate packet with message: ${message}.`;
                 }
             }
         });
-
-        ws.addEventListener("close",() => {
-            p.textContent = "Connection closed.";
-            disconnect();
-        });
-
-        ws.addEventListener("error",(error) => {
-            p.textContent = "An error has occured. "+error;
-        });
-
-        ws.addEventListener("message",(message) => {
-            let rp = {};
-            try {
-                rp = JSON.parse(message.data);
-            }
-            catch (error) {
-                rp.type = "__INVALID__";
-            }
-            try {
-                if (rp.type === "__INVALID__") {
-                    throw `Packet could not be parsed`;
-                }
-
-                if (PacketCallbacks[rp.type]) {
-                    PacketCallbacks[rp.type].forEach((packetFunction) => {
-                        packetFunction(rp.message);
-                    });
-                } else {
-                    throw `Received unidentifiable packet type: ${rp.type}`
-                }
-            }
-            catch (error) {
-                console.error(`Error receiving data: ${error}`);
-                disconnect();
-            }
-        });
-    } else {
-        console.warn(`Cannot connect when we are already connected!`);
     }
 }
 
-function disconnect() {
-    if (ws !== undefined) {
-        ws.close();
-        ws = undefined;
-    }
-    Game.reset();
-}
+//CLIENT FUNCTIONALITY BELOW. EVERYTHING ABOVE THIS LINE CAN BE CUT AND PASTED AND STILL WORK.
 
-addPacketType("--fetch",(message) => {
-    let roomList = message;
-    console.log(roomList);
-    //do something with the array, HERE
-});
-
-addPacketType("--make",(message) => {
-    console.log("Our room is room ID "+message+"! Connecting...");
-    roomID = message;
-    inputGameID.value = roomID;
-    setTimeout(() => {
-        connect("join",{
-            name: myName,
-            passcode: roomPasscode
-        });
-    },100);
-});
-
-addPacketType("--join",(message) => {
-    id = message;
-    console.log(`We joined the game! We are Player ID ${id} in Room ID ${roomID}`);
-    p.textContent = "We joined the game!";
-
-    //begin our pinging
-    Game.pingInterval = setInterval(() => {
-        Game.pinged();
-    },Config.PingInterval);
-});
-
-addPacketType("--refusal",(message) => {
-    console.error(`Connection refused: ${message}`);
-    console.log(message);
-    p.textContent = message;
-    disconnect();
-});
-
-addPacketType("--players",(message) => {
-    if (message.message !== "") {
-        console.log(message.message);
-    }
-    //Load our game's players and roomcommon
-    Game.players = message.array;
-    Game.common = message.common;
-});
-
-addPacketType("--player-connection-update",(message) => {
-    let player = Game.getPlayer(message.id);
-    if (player !== undefined) {
-        player.connected = message.status;
-        if (message.status) {
-            console.log(`${player.name} has reconnected!`);
-        } else {
-            console.log(`Waiting for ${player.name} to reconnect...`);
-        }
-    }
-});
-
-addPacketType("--ping",(message) => {
-    let pingArray = message;
-    for (let p = 0; p < pingArray.length; p++) {
-        Game.getPlayer(pingArray[p].id).ping = pingArray[p].ping;
-    }
-    new Packet("--pong").send();
-});
-
-addPacketType("--pong",(ws,message) => {
-    Game.ponged();
-});
-
-
-//CLIENT FUNCTIONALITY BELOW
+const cn = new Conniption();
 
 const p = document.querySelector("p.status");
 
@@ -267,50 +349,23 @@ const buttonJoin = document.querySelector("button.join");
 const buttonDisconnect = document.querySelector("button.disconnect");
 
 buttonFetch.addEventListener("click",() => {
-    connect("fetch");
+    cn.connect("fetch");
 });
 buttonMake.addEventListener("click",() => {
-    roomName = inputGameName.value;
-    roomPasscode = inputGamePasscode.value;
-    //set other things here?
-    connect("make",{
-        name: roomName,
-        creatorName: myName,
-        passcode: roomPasscode,
-        maxPlayers: roomMaxPlayers
-        //other game configurable game properties would go here
-    });
+    cn.roomName = inputGameName.value;
+    cn.roomPasscode = inputGamePasscode.value;
+    cn.connect("make");
 });
 buttonJoin.addEventListener("click",() => {
-    myName = inputName.value;
-    roomPasscode = inputGamePasscode.value;
-    roomID = inputGameID.value;
-    connect("join",{
-        name: myName,
-        passcode: roomPasscode
-    }); //Don't forget: connect("join",...) is ALSO called on the receiving on a --make packet!!
+    cn.myName = inputName.value;
+    cn.roomPasscode = inputGamePasscode.value;
+    cn.roomID = inputGameID.value;
+    cn.connect("join");
 });
 buttonDisconnect.addEventListener("click",() => {
-    disconnect();
+    cn.disconnect();
 });
 
-function initialize() {
-    myName = "Default";
-    roomName = "Game Room";
-    roomPasscode = "";
-    roomMaxPlayers = 4;
-
-    roomID = undefined;
-    id = undefined;
-    ws = undefined;
-
-    //Set proper content of our inputs and boxes.
-    inputName.value = myName;
-    inputGameName.value = roomName;
-    inputGamePasscode.value = "";
-    //buttonDisconnect.disabled = true;
-
-    console.log("Initialized.");
-}
-
-initialize();
+inputName.value = cn.myName;
+inputGameName.value = cn.roomName;
+inputGamePasscode.value = cn.roomPasscode;

@@ -19,5 +19,6 @@
         "ReconnectionTimeout": 10
     },
     "PingInterval": 500,
-    "PingTimeout": 6000
+    "PingTimeout": 6000,
+    "LogicInterval": 1000
 }

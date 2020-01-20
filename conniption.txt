@@ -19,14 +19,7 @@ connect("join") will join the room with the same ID as our roomID variable.
 
 
 To do:
--add gamecommon
-	-if you move variables in here, MAKE SURE to update the rest of the files.
--functions for changing progress state of a room? put in gamecommon
-	-Game Pause, Game Stop, etc.
 -DOCUMENT EVERYTHING!!
--maybe: make players and rooms extend the event class thing? so they can trigger events of their own.
-
--fill in all them empty functions...
 -assess what functionality is missing in this, from the earlier project.
 	-look at the old config file
 -commands n shit
@@ -43,6 +36,11 @@ ROOM EVENTS:
 -"beforeRemovePlayer" - player
 -"afterRemovePlayer" - player
 -"lostPlayer" - player
+-"logic"
+-"paused"
+-"unpaused"
+-"start"
+-"end"
 
 PLAYER EVENTS:
 -"remove"
@@ -54,6 +52,13 @@ PLAYER EVENTS:
 -PLAYERCOMMON EVENTS:
 
 -GAMECOMMON EVENTS:
+
+-Client Events:
+
+
+-make the client emit events!
+	-every packet should be an event
+-add client example as an entirely separate JS file
 
 
 thoughts for the future:
