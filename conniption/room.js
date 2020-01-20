@@ -156,7 +156,6 @@ module.exports = class Room extends EventEmitter {
                 let timeoutSeconds = Config.get().Users.ReconnectionTimeout;
                 console.log(`${player.common.name} has lost connection. They have ${timeoutSeconds} seconds to reconnect.`);
                 player.lost();
-                this.emit("lostPlayer",player);
             } else {
                 this.removePlayer(player);
             }
@@ -213,7 +212,7 @@ module.exports = class Room extends EventEmitter {
             array.push(this.players[p].common);
         }
         
-        let packet = new Packet("--players",{
+        let packet = new Packet("--update",{
             message: message,
             array: array,
             common: this.common
@@ -276,7 +275,10 @@ module.exports = class Room extends EventEmitter {
             this.common.paused = false;
             if (this.logicInterval === undefined && Config.get().LogicInterval > 0) {
                 this.logicInterval = setInterval(() => {
-                    this.gameLogic();
+                    this.emit("logic");
+                    if (!this.common.paused) {
+                        this.gameLogic();
+                    }
                 },Config.get().LogicInterval);
             }
             this.sendAll(new Packet("--gamestate","start"));
@@ -325,9 +327,6 @@ module.exports = class Room extends EventEmitter {
      * Invoked over a specified interval to do game logic.
      */
     gameLogic() {
-        if (!this.common.paused) {
-            this.emit("logic");
-            this.sendSelf();
-        }
+        this.sendSelf();
     }
 }

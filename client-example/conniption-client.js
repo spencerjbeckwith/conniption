@@ -14,7 +14,8 @@ class Conniption extends EventTarget {
         this.Config = {
             ip: "ws://localhost:44956",
             ServerTimeout: 5000,
-            PingInterval: 500
+            PingInterval: 500,
+            JoinDelay: 100
         }
 
         this.Game = {
@@ -104,8 +105,6 @@ class Conniption extends EventTarget {
             }
         }
 
-        
-
         this.addDefaultPackets();
     }
     
@@ -127,7 +126,11 @@ class Conniption extends EventTarget {
         if (this.ws === undefined) {
             this.ws = new WebSocket(this.Config.ip);
             this.ws.addEventListener("open",() => {
-                //EVENT
+                let event = new Event("connect");
+                event.ws = this.ws;
+                event.request = request;
+                this.dispatchEvent(event);
+
                 switch (request) {
                     case ("fetch"): {
                         new this.Packet(this,"--fetch").send();
@@ -158,14 +161,16 @@ class Conniption extends EventTarget {
             });
     
             this.ws.addEventListener("close",() => {
-                //p.textContent = "Connection closed.";
-                //EVENT
+                let event = new Event("disconnect");
+                event.ws = this.ws;
+                this.dispatchEvent(event);
                 this.disconnect();
             });
     
             this.ws.addEventListener("error",(error) => {
-                //p.textContent = "An error has occured. "+error;
-                //EVENT
+                let event = new Event("error");
+                event.error = error;
+                this.dispatchEvent(event);
             });
     
             this.ws.addEventListener("message",(message) => {
@@ -216,27 +221,31 @@ class Conniption extends EventTarget {
     addDefaultPackets() {
         //FETCH packet: Server sent us a list of all game rooms.
         this.addPacketType("--fetch",(message) => {
-            let roomList = message;
-            console.log(roomList);
-            //do something with the array, HERE
+            let event = new Event("fetch");
+            event.roomList = message;
+            this.dispatchEvent(event);
         });
         
         //MAKE packet: Server approved our request to make a new game room.
         this.addPacketType("--make",(message) => {
             console.log("Our room is room ID "+message+"! Connecting...");
             this.roomID = message;
-            //inputGameID.value = roomID;
-            setTimeout((obj) => {
+            let event = new Event("make");
+            event.roomID = this.roomID;
+            event.timeout = setTimeout((obj) => {
                 obj.connect("join");
-            },100,this);
+            },this.Config.JoinDelay,this);
+            this.dispatchEvent(event);
         });
         
         //JOIN packet: Server approved our attempt to join a game room.
         this.addPacketType("--join",(message) => {
             this.id = message;
             console.log(`We joined the game! We are Player ID ${this.id} in Room ID ${this.roomID}`);
-            //p.textContent = "We joined the game!";
-            //EVENT
+            let event = new Event("join");
+            event.id = this.id;
+            event.roomID = this.roomID;
+            this.dispatchEvent(event);
         
             //begin our pinging
             this.Game.pingInterval = setInterval(function(obj) {
@@ -248,20 +257,28 @@ class Conniption extends EventTarget {
         this.addPacketType("--refusal",(message) => {
             console.error(`Connection refused: ${message}`);
             console.log(message);
-            //p.textContent = message;
-            //EVENT
+            
+            let event = new Event("refused");
+            event.message = message;
+            this.dispatchEvent(event);
+
             this.disconnect();
         });
         
-        //PLAYERS packet: We've gotten an update on the game, game logic, and player connections.
-        this.addPacketType("--players",(message) => {
+        //UPDATE packet: We've gotten an update on the game, game logic, and player connections.
+        this.addPacketType("--update",(message) => {
             if (message.message !== "") {
                 console.log(message.message);
             }
             //Load our game's players and roomcommon
             this.Game.players = message.array;
             this.Game.common = message.common;
-            //EVENT
+
+            let event = new Event("update");
+            event.message = message.message;
+            event.array = message.array;
+            event.common = message.common;
+            this.dispatchEvent(event);
         });
         
         //PLAYER-CONNECTION-UPDATE packet: A player was lost or found on the server.
@@ -271,10 +288,14 @@ class Conniption extends EventTarget {
                 player.connected = message.status;
                 if (message.status) {
                     console.log(`${player.name} has reconnected!`);
-                    //EVENT
+                    let event = new Event("reconnect");
+                    event.player = player;
+                    this.dispatchEvent(event);
                 } else {
                     console.log(`Waiting for ${player.name} to reconnect...`);
-                    //EVENT
+                    let event = new Event("lost");
+                    event.player = player;
+                    this.dispatchEvent(event);
                 }
             }
         });
@@ -286,13 +307,16 @@ class Conniption extends EventTarget {
                 this.Game.getPlayer(pingArray[p].id).ping = pingArray[p].ping;
             }
             new this.Packet(this,"--pong").send();
-            //EVENT
+            let event = new Event("ping");
+            event.pingArray = pingArray;
+            this.dispatchEvent(event);
         });
         
         //PONG packet: The server let us know that they are still there.
         this.addPacketType("--pong",(message) => {
             this.Game.ponged();
-            //EVENT
+            let event = new Event("pong");
+            this.dispatchEvent(event);
         });
         
         //GAMESTATE packet: The game has begun, been paused/unpaused, or ended.
@@ -302,26 +326,30 @@ class Conniption extends EventTarget {
                     console.log("The game has begun!");
                     this.Game.common.inProgress = true;
                     this.Game.common.paused = false;
-                    //EVENT
+                    let event = new Event("start");
+                    this.dispatchEvent(event);
                     break;
                 }
                 case ("paused"): {
                     console.log("The game has been paused.");
                     this.Game.common.paused = true;
-                    //EVENT
+                    let event = new Event("pause");
+                    this.dispatchEvent(event);
                     break;
                 }
                 case ("unpaused"): {
                     console.log("The game has been unpaused.");
                     this.Game.common.paused = false;
-                    //EVENT
+                    let event = new Event("unpause");
+                    this.dispatchEvent(event);
                     break;
                 }
                 case ("end"): {
                     console.log("The game has ended.");
                     this.Game.common.inProgress = false;
                     this.Game.common.paused = false;
-                    //EVENT
+                    let event = new Event("end");
+                    this.dispatchEvent(event);
                     break;
                 }
                 default: {
@@ -369,3 +397,33 @@ buttonDisconnect.addEventListener("click",() => {
 inputName.value = cn.myName;
 inputGameName.value = cn.roomName;
 inputGamePasscode.value = cn.roomPasscode;
+
+cn.addEventListener("disconnect",(event) => {
+    console.log(`Connection closed.`);
+});
+
+cn.addEventListener("error",(event) => {
+    console.error(error);
+});
+
+cn.addEventListener("fetch",(event) => {
+    console.log(event.roomList);
+});
+
+cn.addEventListener("make",(event) => {
+    inputGameID.value = event.roomID;
+});
+
+cn.addEventListener("join",(event) => {
+    p.textContent = "We have joined the game!";
+});
+
+cn.addEventListener("refused",(event) => {
+    p.textContent = event.message;
+});
+
+cn.addEventListener("update",(event) => {
+    if (event.message !== "") {
+        p.textContent = event.message;
+    }
+});
