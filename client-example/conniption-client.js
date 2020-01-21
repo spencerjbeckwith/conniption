@@ -239,9 +239,11 @@ class Conniption extends EventTarget {
             this.roomID = message;
             let event = new Event("make");
             event.roomID = this.roomID;
-            event.timeout = setTimeout((obj) => {
-                obj.connect("join");
-            },this.Config.JoinDelay,this);
+            if (this.Config.JoinDelay > 0) {
+                event.timeout = setTimeout((obj) => {
+                    obj.connect("join");
+                },this.Config.JoinDelay,this);
+            }
             this.dispatchEvent(event);
         });
         

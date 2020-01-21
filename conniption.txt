@@ -7,23 +7,10 @@ Features:
 	-Game Room management
 	-Server configuration/logging
 
-Use prototypes to add new functions or properties to PlayerCommon, Packet, Room, etc.
-OR you can even extend them, yeah?
-
-Make Rooms and Players emit EVENTS! That then can be modified by a user of Conniption...
-
 Using a client:
 connect("fetch") will request a packet, that contains a list of all game rooms.
 connect("make") will make a new game and join it.
 connect("join") will join the room with the same ID as our roomID variable.
-
-
-To do:
--DOCUMENT EVERYTHING!!
--assess what functionality is missing in this, from the earlier project.
-	-look at the old config file
--commands n shit
-	-global commands, and commands only usable by a host.
 
 ROOM EVENTS:
 -"remove"
@@ -62,12 +49,13 @@ PLAYER EVENTS:
 -"unpause" - null
 -"end" - null
 
-
--add client example as an entirely separate JS file
-
--make a GameObject class? So that more things can do logic?
-	-intended to be extended when in use. Does processing that doesn't necessarily need to be a player's or room's, but for very specific objects...
--if a host disconencts, is a new host already set?
+To do:
+-write whatever few remaining wiki pages need to be made
+-put links between the wiki pages, as well as a footer that leads to important topics
+-tutorial pages: How to write a server, How to make a Client, etc.
+-fix up readme.md
+-publish on NPM
+-make a new test project and put this to the test!
 
 thoughts for the future:
 	-how can a player timing out send more updates about how long they have left to reconnect?

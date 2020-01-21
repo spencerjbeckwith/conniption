@@ -103,6 +103,9 @@ module.exports = class Player extends EventEmitter {
         this.common.connected = true;
         clearTimeout(this.reconnectionTimeout);
         this.reconnectionTimeout = undefined;
+        if (obj.room.common.paused) { //Unpause the game if it is paused.
+            obj.room.pauseGame();
+        }
 
         this.ws = ws;
         this.ws.myRoom = this.room;
