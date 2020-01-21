@@ -225,10 +225,12 @@ addPacketType("--join",(ws,rp) => {
     }
 });
 
+//Ping packet: ping to all players of all rooms.
 addPacketType("--ping",(ws,rp) => {
     new Packet("--pong").send(ws);
 });
 
+//Pong packet: reset the timeout of whoever had sent it.
 addPacketType("--pong",(ws,rp) => {
     RoomManager.getRoom(rp.room).getPlayer(rp.id).ponged();
 });
@@ -243,6 +245,30 @@ function launch(file = "config/config.json") {
     Config.load(file,launchServer);
 }
 
+function setRoomEventFunction(callbackFn) {
+    Room.prototype.eventFunction = callbackFn;
+}
+
+function setRoomLogicFunction(callbackFn) {
+    Room.prototype.gameLogic = callbackFn;
+}
+
+function setPlayerEventFunction(callbackFn) {
+    Player.prototype.eventFunction = callbackFn;
+}
+
+function setPlayerLogicFunction(callbackFn) {
+    Player.prototype.gameLogic = callbackFn;
+}
+
+function packetRoom(rp) {
+    return RoomManager.getRoom(rp.roomID);
+}
+
+function packetPlayer(rp) {
+    return packetRoom(rp).getPlayer(rp.id);
+}
+
 module.exports = {
     WebSocket: WebSocket,
     Config: Config,
@@ -253,5 +279,11 @@ module.exports = {
     Player: Player,
     RoomManager: RoomManager,
     addPacketType: addPacketType,
-    launch: launch
+    launch: launch,
+    setRoomEventFunction: setRoomEventFunction,
+    setRoomLogicFunction: setRoomLogicFunction,
+    setPlayerEventFunction: setPlayerEventFunction,
+    setPlayerLogicFunction: setPlayerLogicFunction,
+    packetRoom: packetRoom,
+    packetPlayer: packetPlayer
 }

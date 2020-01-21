@@ -21,8 +21,9 @@ module.exports = class Player extends EventEmitter {
         this.pingTimeout = undefined;
         this.lastPing = 0;
 
-        //more stuff here
-        //HOW can I make it so you can add more properties to a player?
+        if (this.eventFunction !== undefined) { //Set this via prototype if you want events
+            this.eventFunction();
+        }
     }
 
     /**
@@ -126,5 +127,12 @@ module.exports = class Player extends EventEmitter {
         clearTimeout(this.pingTimeout);
         this.pingTimeout = undefined;
         this.common.ping = Date.now()-this.lastPing;
+    }
+
+    /**
+     * Invoked over a specified interval to do game logic.
+     */
+    gameLogic() {
+        //Does nothing by default. Must be overwritten via cn.Player.prototype.gameLogic = function() {...}
     }
 }

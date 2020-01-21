@@ -24,10 +24,6 @@ To do:
 	-look at the old config file
 -commands n shit
 	-global commands, and commands only usable by a host.
--how to make a player? and how to make the player easily extensible? ooh.
-	-how to extend it at all? It has something to do with modifying prototypes, yes?
--how to make an easy client-side framework that can be used in pure JS?
--what exactly will a game based on this, ACTUALLY look like?
 
 ROOM EVENTS:
 -"remove"
@@ -35,12 +31,11 @@ ROOM EVENTS:
 -"afterConnection" - player
 -"beforeRemovePlayer" - player
 -"afterRemovePlayer" - player
--"lostPlayer" - player
--"logic"
+-"start"
 -"paused"
 -"unpaused"
--"start"
 -"end"
+-"logic"
 
 PLAYER EVENTS:
 -"remove"
@@ -49,17 +44,30 @@ PLAYER EVENTS:
 -"lost"
 -"found"
 
--PLAYERCOMMON EVENTS:
-
--GAMECOMMON EVENTS:
-
 -Client Events:
+-"connect" - ws, request
+-"disconnect" - websocket
+-"error" - ws, error
+-"fetch" - roomList
+-"make" - roomID, timeout
+-"join" - id, roomID
+-"refused" - message
+-"update" - message, array, common
+-"reconnect" - player
+-"lost" - player
+-"ping" - pingArray
+-"pong" - null
+-"start" - null
+-"pause" - null
+-"unpause" - null
+-"end" - null
 
 
--make the client emit events!
-	-every packet should be an event
 -add client example as an entirely separate JS file
 
+-make a GameObject class? So that more things can do logic?
+	-intended to be extended when in use. Does processing that doesn't necessarily need to be a player's or room's, but for very specific objects...
+-if a host disconencts, is a new host already set?
 
 thoughts for the future:
 	-how can a player timing out send more updates about how long they have left to reconnect?

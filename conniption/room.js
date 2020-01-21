@@ -14,6 +14,10 @@ module.exports = class Room extends EventEmitter {
         this.players = [];
         this.manager = undefined;
 
+        if (this.eventFunction !== undefined) { //Set this via prototype if you want events
+            this.eventFunction();
+        }
+
         console.log(`New room "${this.common.name}" created with ID ${this.common.id}. Waiting for players...`);
         this.myTimeout = undefined;
         this.logicInterval = undefined;
@@ -274,10 +278,13 @@ module.exports = class Room extends EventEmitter {
             this.common.inProgress = true
             this.common.paused = false;
             if (this.logicInterval === undefined && Config.get().LogicInterval > 0) {
-                this.logicInterval = setInterval(() => {
+                this.logicInterval = setInterval(() => { // Logic interval
                     this.emit("logic");
                     if (!this.common.paused) {
                         this.gameLogic();
+                        for (let p = 0; p < this.players.length; p++) {
+                            this.players[p].gameLogic();
+                        }
                     }
                 },Config.get().LogicInterval);
             }
@@ -327,6 +334,6 @@ module.exports = class Room extends EventEmitter {
      * Invoked over a specified interval to do game logic.
      */
     gameLogic() {
-        this.sendSelf();
+        //Does nothing by default. Must be overwritten via cn.Room.prototype.gameLogic = function() {...}
     }
 }
