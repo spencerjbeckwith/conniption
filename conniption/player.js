@@ -74,9 +74,16 @@ module.exports = class Player extends EventEmitter {
      * Invoked on a player when their connection is lost, and you want them to have the chance to reconnect.
      */
     lost() {
+        if (!this.room.common.paused) { //Pause the game if it isn't already. It is locked by our connected state.
+            this.room.pauseGame();
+        }
+
         this.common.connected = false;
         this.reconnectionTimeout = setTimeout((obj) => {
             obj.room.removePlayer(obj);
+            if (obj.room.common.paused) { //Unpause the game if it is paused.
+                obj.room.pauseGame();
+            }
         },Config.get().Users.ReconnectionTimeout*1000,this);
 
         //send lost packet
@@ -98,6 +105,7 @@ module.exports = class Player extends EventEmitter {
         this.reconnectionTimeout = undefined;
 
         this.ws = ws;
+        this.ws.myRoom = this.room;
 
         //send found packet
         this.room.sendAll(new Packet("--player-connection-update",{

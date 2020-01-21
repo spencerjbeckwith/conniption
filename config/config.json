@@ -20,5 +20,6 @@
     },
     "PingInterval": 500,
     "PingTimeout": 6000,
-    "LogicInterval": 1000
+    "LogicInterval": 1000,
+    "GameStateRestricted": true
 }

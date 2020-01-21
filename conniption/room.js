@@ -61,10 +61,10 @@ module.exports = class Room extends EventEmitter {
             let obj = this.players[p];
             if (!obj.common.connected) { //We looking for any reconnections?
                 if (obj.common.name === name && obj.ip === ip && obj.room === this) {
-                    console.log(`Player ${obj.common.name} has reconnected!`);
+                    console.log(`Player "${obj.common.name}" has reconnected to their Room, ID: ${this.common.id}`);
                     obj.found(ws);
                     this.sendSelf();
-                    return;
+                    return obj;
                 }
             }
         }
@@ -99,7 +99,7 @@ module.exports = class Room extends EventEmitter {
         ws.myRoom = this;
         ws.myPlayer = player;
         console.log(`Player "${player.common.name}" with ID ${player.common.id} and IP ${player.ip} has joined Room "${this.common.name}" with ID ${this.common.id}.`);
-        if (this.host === name) { //Our host connected!
+        if (this.common.host === name) { //Our host connected!
             this.setHost(player);
         }
         this.sendSelf(`${name} has connected!`);
@@ -138,7 +138,13 @@ module.exports = class Room extends EventEmitter {
             this.emit("beforeRemovePlayer",player);
             player.remove();
             this.players.splice(index,1);
+
+            if (this.getHost() === player.common.id) {
+                this.findHost(player.common.name);
+            }
+
             this.sendSelf(`${player.common.name} has disconnected.`);
+            console.log(`Player "${player.common.name}" with ID ${player.common.id} and IP ${player.ip} has disconnected from Room "${this.common.name}" with ID ${this.common.id}.`);
 
             //Are we empty? Set our timeout?
             if (this.players.length === 0) {
@@ -158,7 +164,7 @@ module.exports = class Room extends EventEmitter {
         if (player !== undefined) {
             if (this.common.inProgress && Config.get().Users.AllowReconnection) {
                 let timeoutSeconds = Config.get().Users.ReconnectionTimeout;
-                console.log(`${player.common.name} has lost connection. They have ${timeoutSeconds} seconds to reconnect.`);
+                console.log(`Player "${player.common.name}" has lost connection. They have ${timeoutSeconds} seconds to reconnect to their Room, ID: ${this.common.id}`);
                 player.lost();
             } else {
                 this.removePlayer(player);
@@ -182,25 +188,44 @@ module.exports = class Room extends EventEmitter {
      * @param {Player} player The Player instance to make the host.
     */
     setHost(player) {
-        if (this.getHost() !== player) {
+        if (this.getHost() !== player.common.id) {
             //Unset our old host, if we had one.
             for (let p = 0; p < this.players.length; p++) {
                 this.players[p].common.isHost = false;
             }
             if (player !== undefined) {
-                this.common.host = player;
+                this.common.host = player.common.id;
                 player.common.isHost = true;
-                console.log(`Host of Room ID ${this.common.id} set to the Player "${player.common.name}" with IP ${this.host.ip}.`);
+                console.log(`Host of Room ID ${this.common.id} set to the Player with ID ${player.common.id} with IP ${player.ip}.`);
             }
         }
     }
 
     /**
      * Returns the host of this Room.
-     * @returns {Player|String} The Player who is currently the host, or the String name of the Player who created the room if they haven't connected.
+     * @returns {Number|String} The Player ID who is currently the host, or the String name of the Player who created the room if they haven't connected.
      */
     getHost() {
         return this.common.host;
+    }
+
+    /**
+     * Finds a new host for this Room.
+     * @param {String} lastHostName The name of the last host to reset to, in case nobody else is connected.
+     */
+    findHost(lastHostName) {
+        let player = lastHostName;
+        for (let h = 0; h < this.players.length; h++) {
+            if (this.players[h] !== undefined) {
+                player = this.players[h];
+                break;
+            }
+        }
+        if (player === lastHostName) {
+            this.common.host = player;
+        } else {
+            this.setHost(player);
+        }
     }
 
     /**
@@ -208,9 +233,6 @@ module.exports = class Room extends EventEmitter {
      * @param {[String]} message An optional message to send alongside the array, to all players.
      */
     sendSelf(message = "") {
-        if (message !== "") {
-            console.log(message);
-        }
         let array = [];
         for (let p = 0; p < this.players.length; p++) {
             array.push(this.players[p].common);
@@ -271,27 +293,44 @@ module.exports = class Room extends EventEmitter {
     }
 
     /**
+     * Returns true if all Players of this Room are connected, false if the Room is waiting for any to reconnect.
+     * @returns {Boolean}
+     */
+    allConnected() {
+        for (let p = 0; p < this.players.length; p++) {
+            if (!this.players[p].common.connected) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * When called, begins the game and launches the game logic interval.
      */
     startGame() {
-        if (!this.common.inProgress) {
-            this.common.inProgress = true
-            this.common.paused = false;
-            if (this.logicInterval === undefined && Config.get().LogicInterval > 0) {
-                this.logicInterval = setInterval(() => { // Logic interval
-                    this.emit("logic");
-                    if (!this.common.paused) {
-                        this.gameLogic();
-                        for (let p = 0; p < this.players.length; p++) {
-                            this.players[p].gameLogic();
+        if (this.allConnected()) {
+            if (!this.common.inProgress) {
+                this.common.inProgress = true
+                this.common.paused = false;
+                if (this.logicInterval === undefined && Config.get().LogicInterval > 0) {
+                    this.logicInterval = setInterval(() => { // Logic interval
+                        this.emit("logic");
+                        if (!this.common.paused) {
+                            this.gameLogic();
+                            for (let p = 0; p < this.players.length; p++) {
+                                this.players[p].gameLogic();
+                            }
                         }
-                    }
-                },Config.get().LogicInterval);
+                    },Config.get().LogicInterval);
+                }
+                this.sendAll(new Packet("--gamestate","start"));
+                this.emit("start");
+            } else {
+                console.warn(`Cannot start a Room that is already in progress! ID: ${this.common.id}`);
             }
-            this.sendAll(new Packet("--gamestate","start"));
-            this.emit("start");
         } else {
-            console.warn(`Cannot start a Game that is already in progress! ID: ${this.common.id}`);
+            console.warn(`Cannot start a Room without all Players connected! ID: ${this.common.id}`);
         }
     }
 
@@ -299,16 +338,24 @@ module.exports = class Room extends EventEmitter {
      * Pauses or unpauses the game. This prevents the logic interval from firing, but maintains the session.
      */
     pauseGame() {
-        if (!this.common.paused) {
-            //Pause
-            this.common.paused = true;
-            this.sendAll(new Packet("--gamestate","paused"));
-            this.emit("paused");
+        if (this.allConnected()) {
+            if (this.common.inProgress) {
+                if (!this.common.paused) {
+                    //Pause
+                    this.common.paused = true;
+                    this.sendAll(new Packet("--gamestate","paused"));
+                    this.emit("paused");
+                } else {
+                    //Unpause
+                    this.common.paused = false;
+                    this.sendAll(new Packet("--gamestate","unpaused"));
+                    this.emit("unpaused");
+                }
+            } else {
+                console.warn(`Cannot pause a Room that is not in progress! ID: ${this.common.id}`);
+            }
         } else {
-            //Unpause
-            this.common.paused = false;
-            this.sendAll(new Packet("--gamestate","unpaused"));
-            this.emit("unpaused");
+            console.warn(`Cannot pause or unpause a Room without all Players connected! ID: ${this.common.id}`)
         }
     }
 
@@ -316,17 +363,21 @@ module.exports = class Room extends EventEmitter {
      * Ends a game and stops the game logic interval.
      */
     endGame() {
-        if (this.common.inProgress) {
-            this.common.inProgress = false;
-            this.common.paused = false;
-            if (this.logicInterval !== undefined) {
-                clearInterval(this.logicInterval);
-                this.logicInterval = undefined;
+        if (this.allConnected()) {
+            if (this.common.inProgress) {
+                this.common.inProgress = false;
+                this.common.paused = false;
+                if (this.logicInterval !== undefined) {
+                    clearInterval(this.logicInterval);
+                    this.logicInterval = undefined;
+                }
+                this.sendAll(new Packet("--gamestate","end"));
+                this.emit("end");
+            } else {
+                console.warn(`Cannot end a Room that is not in progress! ID: ${this.common.id}`);
             }
-            this.sendAll(new Packet("--gamestate","end"));
-            this.emit("end");
         } else {
-            console.warn(`Cannot end a Game that is not in progress! ID: ${this.common.id}`);
+            console.warn(`Cannot end a Room without all Players connected! ID: ${this.common.id}`);
         }
     }
 

@@ -6,6 +6,7 @@ const Config = require("./conniption/config.js");
 const Utility = require("./conniption/utility.js");
 const Packet = require("./conniption/packet.js");
 const Room = require("./conniption/room.js");
+const RoomCommon = require("./conniption/roomcommon.js");
 const PlayerCommon = require("./conniption/playercommon.js");
 const Player = require("./conniption/player.js");
 
@@ -100,7 +101,6 @@ const RoomManager = {
     }
 }
 
-
 /**
  * Adds a new handling function when the server receives a packet of a certain type.
  * @param {String} name The label of received packets that should react this way.
@@ -112,7 +112,7 @@ function addPacketType(name,callbackFn) {
 }
 
 /**
- * Internal function that opens the server.
+ * Internal function that opens the server. This is not exposed through NPM because it is called by cn.launch()
  */
 function launchServer() {
     console.log(`Opening server on port ${Config.get().Port}...`);
@@ -235,6 +235,31 @@ addPacketType("--pong",(ws,rp) => {
     RoomManager.getRoom(rp.room).getPlayer(rp.id).ponged();
 });
 
+//gamestate packet: A client's request to change their game's state.
+addPacketType("--gamestate",(ws,rp) => {
+    let myRoom = packetRoom(rp);
+    let myPlayer = packetPlayer(rp);
+    if (!Config.get().GameStateRestricted || myRoom.common.host === myPlayer.common.id) {
+        switch (rp.message) {
+            case ("start"): {
+                myRoom.startGame();
+                break;
+            }
+            case ("pause"): {
+                myRoom.pauseGame();
+                break;
+            }
+            case ("end"): {
+                myRoom.endGame();
+                break;
+            }
+            default: {
+                throw `Invalid gamestate packet request: ${rp.message}`;
+            }
+        }
+    }
+});
+
 //Put default packet types here.
 
 /**
@@ -245,41 +270,75 @@ function launch(file = "config/config.json") {
     Config.load(file,launchServer);
 }
 
+/**
+ * Sets the Room prototype's eventFunction.
+ * @param {Function} callbackFn Function to call on every Room instance when it is created.
+ */
 function setRoomEventFunction(callbackFn) {
     Room.prototype.eventFunction = callbackFn;
 }
 
+/**
+ * Sets the Room prototype's gameLogic method.
+ * @param {Function} callbackFn Function to use as every Room instance's gameLogic method.
+ */
 function setRoomLogicFunction(callbackFn) {
     Room.prototype.gameLogic = callbackFn;
 }
 
+/**
+ * Sets the Player prototype's eventFunction.
+ * @param {Function} callbackFn Function to call on every Player instance when it is created.
+ */
 function setPlayerEventFunction(callbackFn) {
     Player.prototype.eventFunction = callbackFn;
 }
 
+/**
+ * Sets the Player prototype's gameLogic method.
+ * @param {Function} callbackFn Function to use as every Player instance's gameLogic method.
+ */
 function setPlayerLogicFunction(callbackFn) {
     Player.prototype.gameLogic = callbackFn;
 }
 
+/**
+ * Returns the Room instance of which the client that sent the specified Packet belongs to.
+ * @param {Packet} rp The Packet received.
+ * @returns {Room} The Room instance.
+ */
 function packetRoom(rp) {
-    return RoomManager.getRoom(rp.roomID);
+    return RoomManager.getRoom(rp.room);
 }
 
+/**
+ * Returns the Player instance of the client that sent the specified Packet.
+ * @param {Packet} rp The Packet received.
+ * @returns {Player} The Player instance.
+ */
 function packetPlayer(rp) {
-    return packetRoom(rp).getPlayer(rp.id);
+    let rm = packetRoom(rp);
+    if (rm !== undefined) {
+        return packetRoom(rp).getPlayer(rp.id);
+    }
+    return undefined;
 }
 
 module.exports = {
+    //Classes/Objects
     WebSocket: WebSocket,
     Config: Config,
     Utility: Utility,
     Packet: Packet,
     Room: Room,
-    PlayerCommon: PlayerCommon,
+    RoomCommon: RoomCommon,
     Player: Player,
+    PlayerCommon: PlayerCommon,
     RoomManager: RoomManager,
-    addPacketType: addPacketType,
+
+    //Functions
     launch: launch,
+    addPacketType: addPacketType,
     setRoomEventFunction: setRoomEventFunction,
     setRoomLogicFunction: setRoomLogicFunction,
     setPlayerEventFunction: setPlayerEventFunction,

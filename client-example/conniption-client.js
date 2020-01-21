@@ -28,9 +28,9 @@ class Conniption extends EventTarget {
         
             /**
              * Returns a client-side PlayerCommon instance with a specified ID.
-             * @param {Number} checkID The server-generator ID of the player to check.
+             * @param {Number} checkID The server-generated ID of the player to check.
              */
-            getPlayer(checkID = id) {
+            getPlayer(checkID) {
                 for (let i = 0; i < this.players.length; i++) {
                     if (this.players[i].id === checkID) {
                         return this.players[i];
@@ -216,6 +216,13 @@ class Conniption extends EventTarget {
     }
 
     /**
+     * Sends a GameState packet to request a change in the gamestate.
+     */
+    gameState(request) {
+        new this.Packet(this,"--gamestate",request).send();;
+    }
+
+    /**
      * Adds all code for the default Conniption client packets.
      */
     addDefaultPackets() {
@@ -376,10 +383,15 @@ const buttonMake = document.querySelector("button.make");
 const buttonJoin = document.querySelector("button.join");
 const buttonDisconnect = document.querySelector("button.disconnect");
 
+const buttonStart = document.querySelector("button.start");
+const buttonPause = document.querySelector("button.pause");
+const buttonEnd = document.querySelector("button.end");
+
 buttonFetch.addEventListener("click",() => {
     cn.connect("fetch");
 });
 buttonMake.addEventListener("click",() => {
+    cn.myName = inputName.value;
     cn.roomName = inputGameName.value;
     cn.roomPasscode = inputGamePasscode.value;
     cn.connect("make");
@@ -394,6 +406,16 @@ buttonDisconnect.addEventListener("click",() => {
     cn.disconnect();
 });
 
+buttonStart.addEventListener("click",() => {
+    cn.gameState("start");
+});
+buttonPause.addEventListener("click",() => {
+    cn.gameState("pause");
+});
+buttonEnd.addEventListener("click",() => {
+    cn.gameState("end");
+});
+
 inputName.value = cn.myName;
 inputGameName.value = cn.roomName;
 inputGamePasscode.value = cn.roomPasscode;
@@ -403,7 +425,7 @@ cn.addEventListener("disconnect",(event) => {
 });
 
 cn.addEventListener("error",(event) => {
-    console.error(error);
+    console.error(event.error);
 });
 
 cn.addEventListener("fetch",(event) => {
