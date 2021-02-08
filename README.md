@@ -1,4 +1,4 @@
 # conniption
 A WebSocket-based framework for creating fast and fun browser games
 
-Please note that this package is UNDER DEVELOPMENT.
+This package is abandoned. The methodology to create individual rooms all running under one app is a terrible idea, because one uncaught error in any room will crash them all and interrupt every game in progress. Also, I don't trust my code here because I didn't actually test it thoroughly like I should have. The model is just very inflexible and unscalable and you shouldn't use this. I think that the same goal of hosting multiple game lobbies could be accomplished in a much more flexible way, by spawning child processes from a main lobby app. That way they are controlled independently and could crash independently, and maybe(?) it would be possible to utilize multiple cores that way. I don't know the specifics but that'd probably be the way to go.
